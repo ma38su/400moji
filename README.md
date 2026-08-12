@@ -1,8 +1,12 @@
 # 四百字
 
+[![Deploy to GitHub Pages](https://github.com/ma38su/400moji/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/ma38su/400moji/actions/workflows/deploy-pages.yml)
+
 20字×20行の縦書き原稿用紙で、作文の下書きを作るためのシンプルなWebアプリです。
 
-公開URL: https://ma38su.github.io/400moji/
+## 公開サイト
+
+**[四百字を開く](https://ma38su.github.io/400moji/)**
 
 ## できること
 
