@@ -33,7 +33,11 @@
     <section class="workspace" aria-label="原稿エディタ">
       <div class="paper-wrap">
         <div class="paper-heading">
-          <span id="pageLabel">1枚目</span>
+          <div class="page-nav paper-pagination" aria-label="ページ送り">
+            <button id="prevPage" aria-label="前のページ">←</button>
+            <span id="pageCount">1 / 1</span>
+            <button id="nextPage" aria-label="次のページ">→</button>
+          </div>
           <span class="keyboard-hint">用紙をクリックして入力</span>
         </div>
         <div id="paper" class="paper" role="textbox" aria-label="縦書き原稿用紙" aria-multiline="true" tabindex="0"></div>
@@ -48,11 +52,6 @@
           <div class="meter"><span id="meterFill"></span></div>
           <p id="sheetCount">1枚目・未入力</p>
           <p id="inputCharCount">入力文字数: 0文字</p>
-        </div>
-        <div class="page-nav">
-          <button id="prevPage" aria-label="前のページ">←</button>
-          <span id="pageCount">1 / 1</span>
-          <button id="nextPage" aria-label="次のページ">→</button>
         </div>
         <div class="note">
           <span class="eyebrow">保存について</span>

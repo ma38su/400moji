@@ -44,7 +44,12 @@ button, summary { cursor: pointer; }
 
 main { padding: 36px 4vw 64px; }
 .workspace { display: grid; grid-template-columns: minmax(520px, 800px) 220px; justify-content: center; align-items: start; gap: 32px; }
-.paper-heading { display: flex; justify-content: space-between; color: var(--muted); font: 12px system-ui, sans-serif; margin-bottom: 10px; }
+.paper-heading {
+  width: 792px; max-width: 100%; margin: 0 auto 10px;
+  min-height: 38px; position: relative;
+  display: flex; justify-content: flex-end; align-items: center;
+  color: var(--muted); font: 12px system-ui, sans-serif;
+}
 .paper-wrap { position: relative; }
 .paper {
   --cell: min(3.2vw, 31px);
@@ -103,13 +108,18 @@ main { padding: 36px 4vw 64px; }
 .page-nav { display: flex; align-items: center; justify-content: space-between; font: 13px system-ui,sans-serif; }
 .page-nav button { width: 38px; height: 38px; border: 1px solid var(--line); background: var(--paper); border-radius: 50%; }
 .page-nav button:disabled { opacity: .3; cursor: default; }
+.paper-pagination {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  justify-content: center; gap: 10px; min-height: 38px;
+}
+.paper-pagination span { min-width: 46px; text-align: center; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); padding: 10px 16px; background: var(--ink); color: white; border-radius: 6px; font: 13px system-ui,sans-serif; opacity: 0; pointer-events:none; transition: .2s; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 1160px) {
   .workspace { grid-template-columns: 1fr; }
   .sidebar { position: static; grid-template-columns: 1fr 1fr; }
-  .page-nav { grid-column: 1/-1; order: -1; }
+  .paper-heading { width: 92vw; }
   .paper { --cell: calc((92vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20); }
   .keyboard-hint, .save-status { display:none; }
 }
@@ -118,7 +128,7 @@ main { padding: 36px 4vw 64px; }
   .brand > span:last-child, #printButton { display:none; }
   main { padding: 22px 2vw 50px; }
   .sidebar { grid-template-columns: 1fr; }
-  .page-nav { grid-column: auto; }
+  .paper-heading { width: 96vw; }
   .paper {
     --binding: 28px; --column-gap: 2px; --paper-pad: 8px;
     --cell: calc((96vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20);

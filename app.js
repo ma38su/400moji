@@ -10,7 +10,7 @@ const els = {
   title: document.querySelector("#title"), saveStatus: document.querySelector("#saveStatus"),
   charCount: document.querySelector("#charCount"), sheetCount: document.querySelector("#sheetCount"),
   inputCharCount: document.querySelector("#inputCharCount"),
-  meterFill: document.querySelector("#meterFill"), pageLabel: document.querySelector("#pageLabel"),
+  meterFill: document.querySelector("#meterFill"),
   pageCount: document.querySelector("#pageCount"), prevPage: document.querySelector("#prevPage"),
   nextPage: document.querySelector("#nextPage"), toast: document.querySelector("#toast")
 };
@@ -156,7 +156,6 @@ function render() {
   }
   els.inputCharCount.textContent = `入力文字数: ${inputCharCount.toLocaleString("ja-JP")}文字`;
   els.meterFill.style.width = `${Math.min(100, (layout.usedSlots % PAGE_SIZE || (layout.usedSlots ? PAGE_SIZE : 0)) / PAGE_SIZE * 100)}%`;
-  els.pageLabel.textContent = `${page + 1}枚目`;
   els.pageCount.textContent = `${page + 1} / ${pages}`;
   els.prevPage.disabled = page === 0;
   els.nextPage.disabled = page === pages - 1;
