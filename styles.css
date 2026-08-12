@@ -99,6 +99,7 @@ main { padding: 36px 4vw 64px; }
 .meter { height: 3px; margin: 18px 0 10px; background: #ddd4c7; overflow: hidden; }
 .meter span { display: block; height: 100%; width: 0; background: var(--red); transition: width .2s; }
 .stat-card p, .note p { margin: 0; color: var(--muted); font: 12px/1.7 system-ui,sans-serif; }
+.stat-card p + p { margin-top: 3px; }
 .page-nav { display: flex; align-items: center; justify-content: space-between; font: 13px system-ui,sans-serif; }
 .page-nav button { width: 38px; height: 38px; border: 1px solid var(--line); background: var(--paper); border-radius: 50%; }
 .page-nav button:disabled { opacity: .3; cursor: default; }

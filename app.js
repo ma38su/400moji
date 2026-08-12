@@ -9,6 +9,7 @@ const els = {
   paper: document.querySelector("#paper"), input: document.querySelector("#input"),
   title: document.querySelector("#title"), saveStatus: document.querySelector("#saveStatus"),
   charCount: document.querySelector("#charCount"), sheetCount: document.querySelector("#sheetCount"),
+  inputCharCount: document.querySelector("#inputCharCount"),
   meterFill: document.querySelector("#meterFill"), pageLabel: document.querySelector("#pageLabel"),
   pageCount: document.querySelector("#pageCount"), prevPage: document.querySelector("#prevPage"),
   nextPage: document.querySelector("#nextPage"), toast: document.querySelector("#toast")
@@ -51,6 +52,22 @@ function layoutCharacters(chars) {
 
   caretSlots[chars.length] = slot;
   return { slots, caretSlots, slotToIndex, usedSlots: slot };
+}
+function indexAtOrNearSlot(layout, targetSlot, direction) {
+  const exactIndex = layout.caretSlots.findIndex(slot => slot === targetSlot);
+  if (exactIndex !== -1) return exactIndex;
+
+  if (direction > 0) {
+    for (let index = 0; index < layout.caretSlots.length; index++) {
+      if (layout.caretSlots[index] > targetSlot) return index;
+    }
+    return layout.caretSlots.length - 1;
+  }
+
+  for (let index = layout.caretSlots.length - 1; index >= 0; index--) {
+    if (layout.caretSlots[index] < targetSlot) return index;
+  }
+  return 0;
 }
 function getCookie(name) {
   const hit = document.cookie.split("; ").find(row => row.startsWith(`${name}=`));
@@ -125,8 +142,19 @@ function render() {
     fragment.appendChild(cell);
   }
   els.paper.appendChild(fragment);
-  els.charCount.textContent = chars.filter(c => c !== "\n").length.toLocaleString("ja-JP");
-  els.sheetCount.textContent = `${(layout.usedSlots / PAGE_SIZE).toFixed(1)} 枚 / 400字詰め`;
+  const inputCharCount = chars.filter(c => c !== "\n").length;
+  els.charCount.textContent = layout.usedSlots.toLocaleString("ja-JP");
+  if (layout.usedSlots === 0) {
+    els.sheetCount.textContent = "1枚目・未入力";
+  } else {
+    const lastUsedSlot = layout.usedSlots - 1;
+    const usedSheet = Math.floor(lastUsedSlot / PAGE_SIZE) + 1;
+    const slotOnSheet = lastUsedSlot % PAGE_SIZE;
+    const usedColumn = Math.floor(slotOnSheet / 20) + 1;
+    const usedRow = slotOnSheet % 20 + 1;
+    els.sheetCount.textContent = `${usedSheet}枚目・${usedColumn}行目の${usedRow}マス目まで`;
+  }
+  els.inputCharCount.textContent = `入力文字数: ${inputCharCount.toLocaleString("ja-JP")}文字`;
   els.meterFill.style.width = `${Math.min(100, (layout.usedSlots % PAGE_SIZE || (layout.usedSlots ? PAGE_SIZE : 0)) / PAGE_SIZE * 100)}%`;
   els.pageLabel.textContent = `${page + 1}枚目`;
   els.pageCount.textContent = `${page + 1} / ${pages}`;
@@ -165,6 +193,20 @@ els.input.addEventListener("input", () => {
   caret = unitToPoint(documentState.body, els.input.selectionStart);
   page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
   scheduleSave(); render();
+});
+els.input.addEventListener("keydown", event => {
+  if (event.isComposing || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
+  const movement = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: 20, ArrowRight: -20 }[event.key];
+  if (!movement) return;
+
+  const chars = characters(documentState.body);
+  const layout = layoutCharacters(chars);
+  const currentSlot = layout.caretSlots[caret];
+  const targetSlot = currentSlot + movement;
+  if (targetSlot < 0 || targetSlot > layout.usedSlots) return;
+
+  event.preventDefault();
+  focusAt(indexAtOrNearSlot(layout, targetSlot, Math.sign(movement)));
 });
 function syncCaretFromInput() {
   caret = unitToPoint(documentState.body, els.input.selectionStart);
