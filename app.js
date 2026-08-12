@@ -196,7 +196,16 @@ els.input.addEventListener("input", () => {
 });
 els.input.addEventListener("keydown", event => {
   if (event.isComposing || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
-  const movement = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: 20, ArrowRight: -20 }[event.key];
+  const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[event.key];
+  if (characterMovement) {
+    const targetIndex = caret + characterMovement;
+    if (targetIndex < 0 || targetIndex > characters(documentState.body).length) return;
+    event.preventDefault();
+    focusAt(targetIndex);
+    return;
+  }
+
+  const movement = { ArrowLeft: 20, ArrowRight: -20 }[event.key];
   if (!movement) return;
 
   const chars = characters(documentState.body);
