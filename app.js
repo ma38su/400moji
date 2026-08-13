@@ -1,24 +1,34 @@
 import "./styles.css";
 
-const STORAGE_KEY = "yonhyakuji.document.v1";
-const COOKIE_KEY = "yonhyakuji_backup";
+const STORAGE_KEY = "yonhyakuji.library.v2";
+const LEGACY_STORAGE_KEY = "yonhyakuji.document.v1";
 const PAGE_SIZE = 400;
 const VERTICAL_PUNCTUATION = new Set(["。", "、"]);
+let installPrompt;
 
 const els = {
   paper: document.querySelector("#paper"), input: document.querySelector("#input"),
-  title: document.querySelector("#title"), saveStatus: document.querySelector("#saveStatus"),
+  title: document.querySelector("#title"), documentSelect: document.querySelector("#documentSelect"),
+  saveStatus: document.querySelector("#saveStatus"),
   charCount: document.querySelector("#charCount"), sheetCount: document.querySelector("#sheetCount"),
   inputCharCount: document.querySelector("#inputCharCount"),
   meterFill: document.querySelector("#meterFill"),
   pageCount: document.querySelector("#pageCount"), prevPage: document.querySelector("#prevPage"),
-  nextPage: document.querySelector("#nextPage"), toast: document.querySelector("#toast")
+  nextPage: document.querySelector("#nextPage"), toast: document.querySelector("#toast"),
+  nameDialog: document.querySelector("#nameDialog"), nameForm: document.querySelector("#nameForm"),
+  nameDialogTitle: document.querySelector("#nameDialogTitle"), documentName: document.querySelector("#documentName"),
+  nameError: document.querySelector("#nameError"), paperWrap: document.querySelector(".paper-wrap"),
+  paperViewButton: document.querySelector("#paperViewButton"), editViewButton: document.querySelector("#editViewButton"),
+  viewHint: document.querySelector("#viewHint")
 };
 
-let documentState = { title: "無題の原稿", body: "", caret: 0, page: 0, updatedAt: null };
+let library = { activeId: "", documents: [] };
+let documentState;
 let page = 0;
 let caret = 0;
 let saveTimer;
+let nameDialogMode = "new";
+let viewMode = "paper";
 
 function characters(text) { return Array.from(text.replace(/\r/g, "")); }
 function pointToUnit(text, point) { return characters(text).slice(0, point).join("").length; }
@@ -69,20 +79,82 @@ function indexAtOrNearSlot(layout, targetSlot, direction) {
   }
   return 0;
 }
-function getCookie(name) {
-  const hit = document.cookie.split("; ").find(row => row.startsWith(`${name}=`));
-  return hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : null;
+function newId() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+function normalizeName(name) { return String(name || "").trim(); }
+function nameExists(name, exceptId = null) {
+  const normalized = normalizeName(name);
+  return library.documents.some(document => document.id !== exceptId && document.title === normalized);
 }
-function load() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY) || getCookie(COOKIE_KEY);
-    if (saved) documentState = { ...documentState, ...JSON.parse(saved) };
-  } catch { showToast("保存データを読み込めませんでした"); }
+function uniqueName(baseName) {
+  const base = normalizeName(baseName) || "無題の原稿";
+  if (!nameExists(base)) return base;
+  let number = 2;
+  while (nameExists(`${base} ${number}`)) number++;
+  return `${base} ${number}`;
+}
+function createDocument(title, source = {}) {
+  return {
+    id: newId(), title: normalizeName(title), body: String(source.body || ""),
+    caret: Number(source.caret) || 0, page: Number(source.page) || 0,
+    updatedAt: source.updatedAt || null
+  };
+}
+function renderDocumentList() {
+  const fragment = document.createDocumentFragment();
+  library.documents.forEach(savedDocument => {
+    const option = document.createElement("option");
+    option.value = savedDocument.id;
+    option.textContent = savedDocument.title;
+    fragment.appendChild(option);
+  });
+  els.documentSelect.replaceChildren(fragment);
+  els.documentSelect.value = library.activeId;
+}
+function applyActiveDocument() {
+  documentState = library.documents.find(document => document.id === library.activeId) || library.documents[0];
+  library.activeId = documentState.id;
   els.title.value = documentState.title;
   els.input.value = documentState.body;
   const length = characters(documentState.body).length;
   caret = Math.max(0, Math.min(Number(documentState.caret) || 0, length));
-  page = Math.max(0, Number(documentState.page) || Math.floor(caret / PAGE_SIZE));
+  page = Math.max(0, Number(documentState.page) || 0);
+  renderDocumentList();
+}
+function setViewMode(mode, focus = true) {
+  viewMode = mode === "edit" ? "edit" : "paper";
+  library.viewMode = viewMode;
+  els.paperWrap.classList.toggle("edit-mode", viewMode === "edit");
+  els.paperViewButton.setAttribute("aria-pressed", String(viewMode === "paper"));
+  els.editViewButton.setAttribute("aria-pressed", String(viewMode === "edit"));
+  els.viewHint.textContent = viewMode === "edit" ? "選択・コピー・貼り付けができます" : "用紙をクリックして入力";
+  if (!focus) return;
+  if (viewMode === "edit") {
+    els.input.focus({ preventScroll: true });
+    const unit = pointToUnit(documentState.body, caret);
+    els.input.setSelectionRange(unit, unit);
+  } else {
+    render();
+    focusAt(caret);
+  }
+  scheduleSave();
+}
+function load() {
+  try {
+    const savedLibrary = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (savedLibrary?.documents?.length) {
+      library = savedLibrary;
+    } else {
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || "null") || {};
+      const migrated = createDocument(uniqueName(legacy.title || "無題の原稿"), legacy);
+      library = { activeId: migrated.id, documents: [migrated] };
+    }
+  } catch { showToast("保存データを読み込めませんでした"); }
+  if (!library.documents.length) {
+    const initial = createDocument("無題の原稿");
+    library = { activeId: initial.id, documents: [initial] };
+  }
+  applyActiveDocument();
+  setViewMode(library.viewMode || "paper", false);
 }
 function scheduleSave() {
   els.saveStatus.textContent = "保存中…";
@@ -94,17 +166,7 @@ function save() {
   documentState.page = page;
   documentState.updatedAt = new Date().toISOString();
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(documentState));
-    // Cookieは約4KBまでなので、全文の原本はlocalStorage、Cookieは復旧用抜粋とする。
-    const backup = JSON.stringify({
-      title: documentState.title.slice(0, 80),
-      body: characters(documentState.body).slice(0, 250).join(""),
-      caret: Math.min(caret, 250),
-      page: 0,
-      updatedAt: documentState.updatedAt,
-      truncated: characters(documentState.body).length > 250
-    });
-    document.cookie = `${COOKIE_KEY}=${encodeURIComponent(backup)}; max-age=31536000; path=/; SameSite=Lax`;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
     els.saveStatus.textContent = "保存済み";
   } catch { els.saveStatus.textContent = "保存できません"; }
 }
@@ -182,6 +244,32 @@ function download(name, content, type) {
 }
 function safeName() { return (documentState.title.trim() || "無題の原稿").replace(/[\\/:*?"<>|]/g, "_"); }
 
+function activateDocument(id) {
+  clearTimeout(saveTimer);
+  save();
+  library.activeId = id;
+  applyActiveDocument();
+  render();
+}
+function addAndActivate(document) {
+  clearTimeout(saveTimer);
+  save();
+  library.documents.push(document);
+  library.activeId = document.id;
+  applyActiveDocument();
+  save();
+  render();
+  focusAt(0);
+}
+function openNameDialog(mode) {
+  nameDialogMode = mode;
+  els.nameDialogTitle.textContent = mode === "duplicate" ? "ファイルを複製" : "新しいファイル";
+  els.documentName.value = mode === "duplicate" ? uniqueName(`${documentState.title} のコピー`) : uniqueName("無題の原稿");
+  els.nameError.textContent = "";
+  els.nameDialog.showModal();
+  els.documentName.select();
+}
+
 els.paper.addEventListener("click", event => {
   const cell = event.target.closest(".cell");
   focusAt(cell ? Number(cell.dataset.index) : caret);
@@ -194,6 +282,7 @@ els.input.addEventListener("input", () => {
   scheduleSave(); render();
 });
 els.input.addEventListener("keydown", event => {
+  if (viewMode === "edit") return;
   if (event.isComposing || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
   const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[event.key];
   if (characterMovement) {
@@ -224,7 +313,31 @@ function syncCaretFromInput() {
 els.input.addEventListener("keyup", syncCaretFromInput);
 els.input.addEventListener("click", syncCaretFromInput);
 els.input.addEventListener("blur", render);
-els.title.addEventListener("input", () => { documentState.title = els.title.value; scheduleSave(); });
+els.documentSelect.addEventListener("change", () => activateDocument(els.documentSelect.value));
+els.paperViewButton.addEventListener("click", () => setViewMode("paper"));
+els.editViewButton.addEventListener("click", () => setViewMode("edit"));
+function commitDocumentName() {
+  const nextName = normalizeName(els.title.value);
+  if (!nextName) {
+    els.title.value = documentState.title;
+    showToast("ファイル名を入力してください");
+    return;
+  }
+  if (nameExists(nextName, documentState.id)) {
+    els.title.value = documentState.title;
+    showToast("同じ名前のファイルがあります");
+    return;
+  }
+  documentState.title = nextName;
+  renderDocumentList();
+  scheduleSave();
+}
+els.title.addEventListener("keydown", event => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  els.title.blur();
+});
+els.title.addEventListener("blur", commitDocumentName);
 function moveToPage(targetPage) {
   const chars = characters(documentState.body);
   const layout = layoutCharacters(chars);
@@ -234,6 +347,24 @@ function moveToPage(targetPage) {
 }
 els.prevPage.addEventListener("click", () => moveToPage(page - 1));
 els.nextPage.addEventListener("click", () => moveToPage(page + 1));
+document.querySelector("#newDocument").addEventListener("click", () => {
+  document.querySelector(".menu").removeAttribute("open");
+  openNameDialog("new");
+});
+document.querySelector("#duplicateDocument").addEventListener("click", () => {
+  document.querySelector(".menu").removeAttribute("open");
+  openNameDialog("duplicate");
+});
+document.querySelector("#cancelName").addEventListener("click", () => els.nameDialog.close());
+els.nameForm.addEventListener("submit", event => {
+  event.preventDefault();
+  const name = normalizeName(els.documentName.value);
+  if (!name) { els.nameError.textContent = "ファイル名を入力してください"; return; }
+  if (nameExists(name)) { els.nameError.textContent = "同じ名前のファイルがあります"; return; }
+  const source = nameDialogMode === "duplicate" ? { ...documentState, caret: 0, page: 0 } : {};
+  els.nameDialog.close();
+  addAndActivate(createDocument(name, source));
+});
 document.querySelector("#exportText").addEventListener("click", () => download(`${safeName()}.txt`, documentState.body, "text/plain;charset=utf-8"));
 document.querySelector("#exportJson").addEventListener("click", () => download(`${safeName()}.json`, JSON.stringify(documentState, null, 2), "application/json"));
 document.querySelector("#importJson").addEventListener("change", async event => {
@@ -242,13 +373,41 @@ document.querySelector("#importJson").addEventListener("change", async event => 
   try {
     const imported = JSON.parse(await file.text());
     if (typeof imported.body !== "string") throw new Error();
-    documentState = { title: String(imported.title || "無題の原稿"), body: imported.body, caret: 0, page: 0, updatedAt: imported.updatedAt || null };
-    els.title.value = documentState.title; els.input.value = documentState.body; caret = 0; page = 0; save(); render(); showToast("原稿を読み込みました");
+    const name = normalizeName(imported.title || file.name.replace(/\.json$/i, "") || "読み込んだ原稿");
+    if (nameExists(name)) { showToast("同じ名前のファイルがあります"); return; }
+    addAndActivate(createDocument(name, { ...imported, caret: 0, page: 0 }));
+    showToast("原稿を読み込みました");
   } catch { showToast("このJSONは読み込めません"); }
   event.target.value = "";
 });
 document.querySelector("#printButton").addEventListener("click", () => window.print());
 window.addEventListener("beforeunload", save);
+
+const installButton = document.querySelector("#installApp");
+window.addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  installPrompt = event;
+  installButton.hidden = false;
+});
+installButton.addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installButton.hidden = true;
+  await installPrompt.prompt();
+  installPrompt = null;
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  installButton.hidden = true;
+  showToast("400mojiをインストールしました");
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      console.warn("オフライン機能を有効にできませんでした");
+    });
+  });
+}
 
 load();
 render();
