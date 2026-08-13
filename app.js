@@ -19,7 +19,7 @@ const els = {
   nameDialogTitle: document.querySelector("#nameDialogTitle"), documentName: document.querySelector("#documentName"),
   nameError: document.querySelector("#nameError"), paperWrap: document.querySelector(".paper-wrap"),
   paperViewButton: document.querySelector("#paperViewButton"), editViewButton: document.querySelector("#editViewButton"),
-  viewHint: document.querySelector("#viewHint")
+  viewHint: document.querySelector("#viewHint"), fullscreenButton: document.querySelector("#fullscreenButton")
 };
 
 let library = { activeId: "", documents: [] };
@@ -188,6 +188,7 @@ function render() {
     const index = entry?.index ?? layout.slotToIndex[absoluteSlot] ?? chars.length;
     cell.textContent = value;
     if (VERTICAL_PUNCTUATION.has(value)) cell.classList.add("punctuation");
+    if (/^[A-Za-z]$/.test(value)) cell.classList.add("latin");
     if (entry?.trailing) {
       const trailing = document.createElement("span");
       trailing.className = "line-end-punctuation";
@@ -355,6 +356,17 @@ document.querySelector("#duplicateDocument").addEventListener("click", () => {
   document.querySelector(".menu").removeAttribute("open");
   openNameDialog("duplicate");
 });
+document.querySelector("#importClipboard").addEventListener("click", async () => {
+  document.querySelector(".menu").removeAttribute("open");
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) { showToast("クリップボードにテキストがありません"); return; }
+    addAndActivate(createDocument(uniqueName("クリップボードからの原稿"), { body: text }));
+    showToast("クリップボードから新しい原稿を作成しました");
+  } catch {
+    showToast("クリップボードの読み取りを許可してください");
+  }
+});
 document.querySelector("#cancelName").addEventListener("click", () => els.nameDialog.close());
 els.nameForm.addEventListener("submit", event => {
   event.preventDefault();
@@ -382,6 +394,30 @@ document.querySelector("#importJson").addEventListener("change", async event => 
 });
 document.querySelector("#printButton").addEventListener("click", () => window.print());
 window.addEventListener("beforeunload", save);
+
+function fullscreenElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+function updateFullscreenButton() {
+  const active = Boolean(fullscreenElement());
+  els.fullscreenButton.textContent = active ? "全画面を終了" : "全画面";
+  els.fullscreenButton.setAttribute("aria-pressed", String(active));
+}
+els.fullscreenButton.addEventListener("click", async () => {
+  try {
+    if (fullscreenElement()) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      await exit.call(document);
+    } else {
+      const request = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+      if (!request) {
+        showToast("Safariの共有メニューからホーム画面に追加すると全画面で使えます");
+        return;
+      }
+      await request.call(document.documentElement);
+    }
+  } catch { showToast("全画面表示に切り替えられませんでした"); }
+});
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 
 const installButton = document.querySelector("#installApp");
 window.addEventListener("beforeinstallprompt", event => {

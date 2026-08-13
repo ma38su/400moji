@@ -9,7 +9,7 @@
   --grid: rgba(181, 86, 69, .46);
   --grid-strong: rgba(181, 86, 69, .7);
   --line: #d9d1c4;
-  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif CJK JP", "Noto Serif JP", serif;
   color: var(--ink);
   background: var(--ground);
 }
@@ -85,19 +85,31 @@ main { padding: 36px 4vw 64px; }
   outline: 1px solid var(--grid); outline-offset: -1px;
   display: grid; place-items: center; position: relative; z-index: 1;
   font-size: calc(var(--cell) * .67); line-height: 1;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-feature-settings: "vert" 1, "vrt2" 1;
   user-select: none;
 }
 .cell.punctuation {
   place-items: start end;
   padding: calc(var(--cell) * .06) calc(var(--cell) * .08) 0 0;
   font-size: calc(var(--cell) * .58);
-  writing-mode: vertical-rl;
-  text-orientation: upright;
+  text-orientation: mixed;
+}
+.cell.latin {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  font-feature-settings: normal;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif CJK JP", "Noto Serif JP", serif;
 }
 .line-end-punctuation {
-  position: absolute; right: calc(var(--cell) * .04); bottom: calc(var(--cell) * .03);
-  font-size: calc(var(--cell) * .48); line-height: 1;
-  writing-mode: vertical-rl; text-orientation: upright;
+  position: absolute;
+  z-index: 2;
+  top: 52%; right: 2%; bottom: 0; left: 48%;
+  display: grid; place-items: start end;
+  overflow: visible;
+  font-size: calc(var(--cell) * .44); line-height: 1;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-feature-settings: "vert" 1, "vrt2" 1;
 }
 .cell.caret::after { content: ""; position: absolute; height: 72%; width: 2px; background: var(--red); animation: blink 1s step-end infinite; }
 .cell.active { background: rgba(168,66,50,.07); }
@@ -110,8 +122,9 @@ main { padding: 36px 4vw 64px; }
   width: 792px; max-width: 100%; height: 662px; margin: auto; padding: 28px;
   border: 2px solid var(--grid-strong); outline: none; resize: none;
   background: var(--paper); color: var(--ink); box-shadow: 0 18px 55px rgba(61,45,23,.10);
-  writing-mode: vertical-rl; text-orientation: upright;
-  font: 22px/2 "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font: 22px/2 "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif CJK JP", "Noto Serif JP", serif;
+  font-feature-settings: "vert" 1, "vrt2" 1;
   letter-spacing: .08em; overflow: auto; caret-color: var(--red);
 }
 .paper-wrap.edit-mode .input-proxy:focus { border-color: var(--red); }
@@ -153,6 +166,33 @@ main { padding: 36px 4vw 64px; }
   .paper-wrap.edit-mode .input-proxy { width: 92vw; }
   .keyboard-hint, .save-status { display:none; }
 }
+@media (min-width: 700px) and (max-width: 1180px) {
+  html, body { height: 100%; overflow: hidden; }
+  body { min-height: 100dvh; }
+  .topbar { height: 56px; padding: 0 18px; gap: 12px; }
+  .topbar .brand > span:last-child, .save-status, #printButton, .install-button { display: none; }
+  .actions { gap: 6px; }
+  .actions .button, .actions button { padding: 7px 10px; }
+  main { height: calc(100dvh - 56px); padding: 8px 2vw; overflow: hidden; }
+  .workspace { display: block; height: 100%; }
+  .sidebar { display: none; }
+  .paper-heading { width: 96vw; margin-bottom: 6px; min-height: 34px; }
+  .paper {
+    --binding: 40px; --column-gap: 3px; --paper-pad: 12px;
+    --cell: min(
+      calc((96vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20),
+      calc((100dvh - 56px - 8px - 34px - 6px - var(--paper-pad) * 2 - 4px) / 20)
+    );
+  }
+  .paper-wrap.edit-mode .input-proxy {
+    width: 96vw; height: calc(100dvh - 56px - 8px - 34px - 6px);
+    padding: 20px;
+  }
+}
+
+:fullscreen { background: var(--ground); }
+:fullscreen .topbar { position: relative; }
+:fullscreen main { padding-top: 8px; }
 @media (max-width: 600px) {
   .topbar { padding: 0 3vw; gap: 8px; }
   .brand > span:last-child, #printButton { display:none; }

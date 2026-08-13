@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="400moji">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icons/icon-192.png" sizes="192x192">
+  <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <title>400moji — 縦書き原稿用紙</title>
 </head>
@@ -25,12 +25,14 @@
     </div>
     <div class="actions">
       <button id="installApp" class="button install-button" type="button" hidden>アプリをインストール</button>
+      <button id="fullscreenButton" class="button" type="button" aria-pressed="false">全画面</button>
       <details class="menu">
         <summary class="button">ファイル</summary>
         <div class="menu-panel">
           <button id="newDocument">新しいファイル</button>
           <button id="duplicateDocument">複製</button>
           <hr>
+          <button id="importClipboard">クリップボードから読み込む</button>
           <button id="exportText">TXTを書き出す</button>
           <button id="exportJson">JSONを書き出す</button>
           <label class="file-label">JSONを読み込む<input id="importJson" type="file" accept="application/json,.json"></label>
