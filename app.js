@@ -1,9 +1,13 @@
 import "./styles.css";
+import {
+  VERTICAL_PUNCTUATION, characters, pointToUnit, unitToPoint,
+  layoutCharacters, indexAtOrNearSlot, selectionPoints, movePaperSelection,
+  textInSelection, replaceTextSelection
+} from "./editor-logic.js";
 
 const STORAGE_KEY = "yonhyakuji.library.v2";
 const LEGACY_STORAGE_KEY = "yonhyakuji.document.v1";
 const PAGE_SIZE = 400;
-const VERTICAL_PUNCTUATION = new Set(["。", "、"]);
 const HALF_WIDTH_REPLACEMENTS = { "(": "（", ")": "）" };
 let installPrompt;
 
@@ -28,6 +32,7 @@ const els = {
 let library = { activeId: "", documents: [] };
 let documentState;
 let page = 0;
+let renderedPage = null;
 let caret = 0;
 let saveTimer;
 let nameDialogMode = "new";
@@ -36,58 +41,10 @@ let paperSelectionAnchor = null;
 const histories = new Map();
 const documentPositions = new Map();
 
-function characters(text) { return Array.from(text.replace(/\r/g, "")); }
 function normalizeVerticalText(text) {
-  return String(text || "").replace(/[()]/g, character => HALF_WIDTH_REPLACEMENTS[character]);
-}
-function pointToUnit(text, point) { return characters(text).slice(0, point).join("").length; }
-function unitToPoint(text, unit) { return characters(text.slice(0, unit)).length; }
-function layoutCharacters(chars) {
-  const slots = [];
-  const caretSlots = new Array(chars.length + 1);
-  const slotToIndex = [];
-  let slot = 0;
-
-  chars.forEach((value, index) => {
-    caretSlots[index] = slot;
-    if (value === "\n") {
-      // 改行は文字として表示せず、次の縦列の先頭まで送る。
-      const columnOffset = slot % 20;
-      const startsBlankColumn = columnOffset === 0 && (index === 0 || chars[index - 1] === "\n");
-      const remaining = columnOffset === 0 ? (startsBlankColumn ? 20 : 0) : 20 - columnOffset;
-      for (let skipped = 0; skipped < remaining; skipped++) slotToIndex[slot + skipped] = index;
-      slot += remaining;
-      return;
-    }
-    if (VERTICAL_PUNCTUATION.has(value) && slot > 0 && slot % 20 === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
-      // 行頭へ句読点を送らず、行末の文字と同じマスへぶら下げる。
-      slots[slot - 1].trailing = `${slots[slot - 1].trailing || ""}${value}`;
-      (slots[slot - 1].trailingIndexes ||= []).push(index);
-      return;
-    }
-    slots[slot] = { value, index };
-    slotToIndex[slot] = index;
-    slot++;
-  });
-
-  caretSlots[chars.length] = slot;
-  return { slots, caretSlots, slotToIndex, usedSlots: slot };
-}
-function indexAtOrNearSlot(layout, targetSlot, direction) {
-  const exactIndex = layout.caretSlots.findIndex(slot => slot === targetSlot);
-  if (exactIndex !== -1) return exactIndex;
-
-  if (direction > 0) {
-    for (let index = 0; index < layout.caretSlots.length; index++) {
-      if (layout.caretSlots[index] > targetSlot) return index;
-    }
-    return layout.caretSlots.length - 1;
-  }
-
-  for (let index = layout.caretSlots.length - 1; index >= 0; index--) {
-    if (layout.caretSlots[index] < targetSlot) return index;
-  }
-  return 0;
+  return String(text || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[()]/g, character => HALF_WIDTH_REPLACEMENTS[character]);
 }
 function newId() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function normalizeName(name) { return String(name || "").trim(); }
@@ -130,6 +87,8 @@ function applyActiveDocument() {
   const length = characters(documentState.body).length;
   caret = Math.max(0, Math.min(documentPositions.get(documentState.id) || 0, length));
   page = Math.max(0, Number(documentState.page) || 0);
+  renderedPage = null;
+  els.paper.classList.remove("page-turn-next", "page-turn-previous");
   renderDocumentList();
   ensureHistory();
   updateHistoryButtons();
@@ -232,7 +191,9 @@ function render() {
   const layout = layoutCharacters(chars);
   // 400字ちょうど埋まったときは、続けて書ける空白の次ページも用意する。
   const pages = Math.max(1, Math.floor(layout.usedSlots / PAGE_SIZE) + 1);
+  const previousPage = renderedPage;
   page = Math.min(page, pages - 1);
+  renderedPage = page;
   const startSlot = page * PAGE_SIZE;
   const selectionStart = unitToPoint(documentState.body, els.input.selectionStart);
   const selectionEnd = unitToPoint(documentState.body, els.input.selectionEnd);
@@ -265,6 +226,9 @@ function render() {
     fragment.appendChild(cell);
   }
   els.paper.appendChild(fragment);
+  if (previousPage !== null && previousPage !== page && viewMode === "paper") {
+    animatePageTurn(page > previousPage ? "next" : "previous");
+  }
   const inputCharCount = chars.filter(c => c !== "\n").length;
   els.charCount.textContent = layout.usedSlots.toLocaleString("ja-JP");
   if (layout.usedSlots === 0) {
@@ -282,6 +246,14 @@ function render() {
   els.pageCount.textContent = `${page + 1} / ${pages}`;
   els.prevPage.disabled = page === 0;
   els.nextPage.disabled = page === pages - 1;
+}
+
+function animatePageTurn(direction) {
+  const className = direction === "next" ? "page-turn-next" : "page-turn-previous";
+  els.paper.classList.remove("page-turn-next", "page-turn-previous");
+  // 同じ方向へ連続して移動した場合もアニメーションを最初から再生する。
+  void els.paper.offsetWidth;
+  els.paper.classList.add(className);
 }
 
 function createPaperPage(layout, startSlot, className = "paper") {
@@ -361,22 +333,27 @@ function selectOnPaper(anchor, focus) {
   render();
 }
 function paperSelectionPoints() {
-  const start = unitToPoint(documentState.body, els.input.selectionStart);
-  const end = unitToPoint(documentState.body, els.input.selectionEnd);
-  const backward = els.input.selectionDirection === "backward";
-  return {
-    start, end,
-    anchor: backward ? end : start,
-    focus: backward ? start : end
-  };
+  return selectionPoints(
+    documentState.body,
+    els.input.selectionStart,
+    els.input.selectionEnd,
+    els.input.selectionDirection
+  );
 }
 function selectedText() {
-  return documentState.body.slice(els.input.selectionStart, els.input.selectionEnd);
+  return textInSelection(documentState.body, els.input.selectionStart, els.input.selectionEnd);
 }
 function replaceSelection(text) {
   ensureHistory().pending = currentSnapshot();
   els.input.focus({ preventScroll: true });
-  els.input.setRangeText(normalizeVerticalText(text), els.input.selectionStart, els.input.selectionEnd, "end");
+  const replacement = replaceTextSelection(
+    els.input.value,
+    els.input.selectionStart,
+    els.input.selectionEnd,
+    normalizeVerticalText(text)
+  );
+  els.input.value = replacement.text;
+  els.input.setSelectionRange(replacement.caret, replacement.caret);
   els.input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 function closePaperContextMenu() {
@@ -463,6 +440,10 @@ function finishPaperSelection(event) {
 }
 els.paper.addEventListener("pointerup", finishPaperSelection);
 els.paper.addEventListener("pointercancel", finishPaperSelection);
+els.paper.addEventListener("animationend", event => {
+  if (event.target !== els.paper || !event.animationName.startsWith("page-turn-")) return;
+  els.paper.classList.remove("page-turn-next", "page-turn-previous");
+});
 els.paper.addEventListener("contextmenu", event => {
   const cell = event.target.closest(".cell");
   if (!cell) return;
@@ -544,39 +525,11 @@ els.input.addEventListener("keydown", event => {
   if (viewMode === "edit") return;
   if (event.isComposing || event.altKey || event.metaKey || event.ctrlKey) return;
   const selection = paperSelectionPoints();
-  const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[event.key];
-  if (characterMovement) {
-    if (!event.shiftKey && selection.start !== selection.end) {
-      event.preventDefault();
-      focusAt(characterMovement < 0 ? selection.start : selection.end);
-      return;
-    }
-    const targetIndex = selection.focus + characterMovement;
-    if (targetIndex < 0 || targetIndex > characters(documentState.body).length) return;
-    event.preventDefault();
-    if (event.shiftKey) selectOnPaper(selection.anchor, targetIndex);
-    else focusAt(targetIndex);
-    return;
-  }
-
-  const movement = { ArrowLeft: 20, ArrowRight: -20 }[event.key];
-  if (!movement) return;
-
-  const chars = characters(documentState.body);
-  const layout = layoutCharacters(chars);
-  if (!event.shiftKey && selection.start !== selection.end) {
-    event.preventDefault();
-    focusAt(movement < 0 ? selection.start : selection.end);
-    return;
-  }
-  const currentSlot = layout.caretSlots[selection.focus];
-  const targetSlot = currentSlot + movement;
-  if (targetSlot < 0 || targetSlot > layout.usedSlots) return;
-
+  const moved = movePaperSelection(documentState.body, selection, event.key, event.shiftKey);
+  if (!moved) return;
   event.preventDefault();
-  const targetIndex = indexAtOrNearSlot(layout, targetSlot, Math.sign(movement));
-  if (event.shiftKey) selectOnPaper(selection.anchor, targetIndex);
-  else focusAt(targetIndex);
+  if (event.shiftKey) selectOnPaper(moved.anchor, moved.focus);
+  else focusAt(moved.focus);
 });
 function syncCaretFromInput() {
   caret = paperSelectionPoints().focus;
