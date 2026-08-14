@@ -683,7 +683,7 @@ installButton.addEventListener("click", async () => {
 window.addEventListener("appinstalled", () => {
   installPrompt = null;
   installButton.hidden = true;
-  showToast("400mojiをインストールしました");
+  showToast("原稿用紙アプリ - 400mojiをインストールしました");
 });
 
 if ("serviceWorker" in navigator) {
