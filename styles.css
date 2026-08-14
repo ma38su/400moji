@@ -121,6 +121,8 @@ main { padding: 36px 4vw 64px; }
   animation: blink 1s step-end infinite;
 }
 .cell.active { background: rgba(168,66,50,.07); }
+.cell.selected { background: rgba(168,66,50,.24); }
+.cell.selected.active { background: rgba(168,66,50,.3); }
 @keyframes blink { 50% { opacity: 0; } }
 .input-proxy { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; left: -10px; top: -10px; }
 .paper-wrap.edit-mode .paper { display: none; }
@@ -155,6 +157,20 @@ main { padding: 36px 4vw 64px; }
 .paper-pagination span { min-width: 46px; text-align: center; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); padding: 10px 16px; background: var(--ink); color: white; border-radius: 6px; font: 13px system-ui,sans-serif; opacity: 0; pointer-events:none; transition: .2s; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+.context-menu {
+  position: fixed; z-index: 50; min-width: 156px; padding: 6px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--paper); box-shadow: 0 12px 34px rgba(40,37,31,.2);
+  font: 13px system-ui, sans-serif;
+}
+.context-menu[hidden] { display: none; }
+.context-menu button {
+  width: 100%; padding: 8px 12px; border: 0; border-radius: 5px;
+  background: transparent; text-align: left;
+}
+.context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: #f1eadf; outline: none; }
+.context-menu button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.context-menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--line); }
 .name-dialog { width: min(420px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); box-shadow: 0 24px 70px #2c241c38; }
 .name-dialog::backdrop { background: rgba(40,37,31,.28); backdrop-filter: blur(2px); }
 .name-dialog form { display: grid; gap: 12px; padding: 24px; }
@@ -218,7 +234,7 @@ main { padding: 36px 4vw 64px; }
 }
 @media print {
   @page { size: A4 landscape; margin: 0; }
-  .topbar, main, .toast, .name-dialog { display:none !important; }
+  .topbar, main, .toast, .context-menu, .name-dialog { display:none !important; }
   html, body { width: 297mm; min-width: 0; margin: 0; background: white; }
   .print-pages { display: block; }
   .print-sheet {
@@ -238,5 +254,5 @@ main { padding: 36px 4vw 64px; }
     max-width: none; margin: 0 auto; box-shadow: none;
     print-color-adjust: exact; -webkit-print-color-adjust: exact;
   }
-  .cell.caret::after, .cell.active { display:none; background:none; }
+  .cell.caret::after, .cell.active, .cell.selected { display:none; background:none; }
 }

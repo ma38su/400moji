@@ -22,7 +22,7 @@ const els = {
   paperViewButton: document.querySelector("#paperViewButton"), editViewButton: document.querySelector("#editViewButton"),
   viewHint: document.querySelector("#viewHint"), fullscreenButton: document.querySelector("#fullscreenButton"),
   undoButton: document.querySelector("#undoButton"), redoButton: document.querySelector("#redoButton"),
-  printPages: document.querySelector("#printPages")
+  printPages: document.querySelector("#printPages"), contextMenu: document.querySelector("#paperContextMenu")
 };
 
 let library = { activeId: "", documents: [] };
@@ -32,6 +32,7 @@ let caret = 0;
 let saveTimer;
 let nameDialogMode = "new";
 let viewMode = "paper";
+let paperSelectionAnchor = null;
 const histories = new Map();
 const documentPositions = new Map();
 
@@ -61,6 +62,7 @@ function layoutCharacters(chars) {
     if (VERTICAL_PUNCTUATION.has(value) && slot > 0 && slot % 20 === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
       // 行頭へ句読点を送らず、行末の文字と同じマスへぶら下げる。
       slots[slot - 1].trailing = `${slots[slot - 1].trailing || ""}${value}`;
+      (slots[slot - 1].trailingIndexes ||= []).push(index);
       return;
     }
     slots[slot] = { value, index };
@@ -180,7 +182,7 @@ function setViewMode(mode, focus = true) {
   els.paperWrap.classList.toggle("edit-mode", viewMode === "edit");
   els.paperViewButton.setAttribute("aria-pressed", String(viewMode === "paper"));
   els.editViewButton.setAttribute("aria-pressed", String(viewMode === "edit"));
-  els.viewHint.textContent = viewMode === "edit" ? "選択・コピー・貼り付けができます" : "用紙をクリックして入力";
+  els.viewHint.textContent = viewMode === "edit" ? "選択・コピー・貼り付けができます" : "ドラッグで選択・クリックして入力";
   if (!focus) return;
   if (viewMode === "edit") {
     els.input.focus({ preventScroll: true });
@@ -232,6 +234,8 @@ function render() {
   const pages = Math.max(1, Math.floor(layout.usedSlots / PAGE_SIZE) + 1);
   page = Math.min(page, pages - 1);
   const startSlot = page * PAGE_SIZE;
+  const selectionStart = unitToPoint(documentState.body, els.input.selectionStart);
+  const selectionEnd = unitToPoint(documentState.body, els.input.selectionEnd);
   const fragment = document.createDocumentFragment();
   els.paper.replaceChildren();
   for (let i = 0; i < PAGE_SIZE; i++) {
@@ -253,6 +257,8 @@ function render() {
     // 10列目と11列目の間に、原稿用紙の綴じ代用トラックを空ける。
     cell.style.gridColumn = String(column > 10 ? column + 1 : column);
     cell.style.gridRow = String(i % 20 + 1);
+    const cellIndexes = [layout.slotToIndex[absoluteSlot], ...(entry?.trailingIndexes || [])];
+    if (cellIndexes.some(index => index >= selectionStart && index < selectionEnd)) cell.classList.add("selected");
     if (absoluteSlot === layout.caretSlots[caret] && document.activeElement === els.input) cell.classList.add("caret");
     if (absoluteSlot === layout.caretSlots[caret]) cell.classList.add("active");
     cell.dataset.slot = absoluteSlot;
@@ -330,6 +336,51 @@ function focusAt(index) {
   scheduleSave();
   render();
 }
+function paperIndexFromPointer(event, cell) {
+  const chars = characters(documentState.body);
+  const layout = layoutCharacters(chars);
+  const slot = Number(cell.dataset.slot);
+  const rect = cell.getBoundingClientRect();
+  const after = event.clientY >= rect.top + rect.height / 2;
+  return indexAtOrNearSlot(layout, after ? slot + 1 : slot, after ? 1 : -1);
+}
+function selectOnPaper(anchor, focus) {
+  const start = Math.min(anchor, focus);
+  const end = Math.max(anchor, focus);
+  const direction = focus < anchor ? "backward" : "forward";
+  els.input.focus({ preventScroll: true });
+  els.input.setSelectionRange(
+    pointToUnit(documentState.body, start),
+    pointToUnit(documentState.body, end),
+    direction
+  );
+  caret = focus;
+  scheduleSave();
+  render();
+}
+function selectedText() {
+  return documentState.body.slice(els.input.selectionStart, els.input.selectionEnd);
+}
+function replaceSelection(text) {
+  ensureHistory().pending = currentSnapshot();
+  els.input.focus({ preventScroll: true });
+  els.input.setRangeText(normalizeVerticalText(text), els.input.selectionStart, els.input.selectionEnd, "end");
+  els.input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+function closePaperContextMenu() {
+  els.contextMenu.hidden = true;
+}
+function openPaperContextMenu(x, y) {
+  const hasSelection = els.input.selectionStart !== els.input.selectionEnd;
+  for (const action of ["copy", "cut", "delete"]) {
+    els.contextMenu.querySelector(`[data-edit-action="${action}"]`).disabled = !hasSelection;
+  }
+  els.contextMenu.hidden = false;
+  const rect = els.contextMenu.getBoundingClientRect();
+  els.contextMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+  els.contextMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  els.contextMenu.querySelector("button:not(:disabled)")?.focus({ preventScroll: true });
+}
 function showToast(message) {
   els.toast.textContent = message;
   els.toast.classList.add("show");
@@ -379,14 +430,69 @@ els.paper.addEventListener("pointerdown", event => {
   }
 
   event.preventDefault();
-  const chars = characters(documentState.body);
-  const layout = layoutCharacters(chars);
-  const slot = Number(cell.dataset.slot);
-  const rect = cell.getBoundingClientRect();
-  const clickedAfterCharacter = event.clientY >= rect.top + rect.height / 2;
-  const targetSlot = clickedAfterCharacter ? slot + 1 : slot;
-  focusAt(indexAtOrNearSlot(layout, targetSlot, clickedAfterCharacter ? 1 : -1));
+  const index = paperIndexFromPointer(event, cell);
+  paperSelectionAnchor = event.shiftKey
+    ? unitToPoint(documentState.body, els.input.selectionStart)
+    : index;
+  els.paper.setPointerCapture(event.pointerId);
+  selectOnPaper(paperSelectionAnchor, index);
 });
+els.paper.addEventListener("pointermove", event => {
+  if (paperSelectionAnchor === null || !els.paper.hasPointerCapture(event.pointerId)) return;
+  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest(".cell");
+  if (!cell || !els.paper.contains(cell)) return;
+  event.preventDefault();
+  selectOnPaper(paperSelectionAnchor, paperIndexFromPointer(event, cell));
+});
+function finishPaperSelection(event) {
+  if (paperSelectionAnchor === null) return;
+  if (els.paper.hasPointerCapture(event.pointerId)) els.paper.releasePointerCapture(event.pointerId);
+  paperSelectionAnchor = null;
+}
+els.paper.addEventListener("pointerup", finishPaperSelection);
+els.paper.addEventListener("pointercancel", finishPaperSelection);
+els.paper.addEventListener("contextmenu", event => {
+  const cell = event.target.closest(".cell");
+  if (!cell) return;
+  event.preventDefault();
+  const index = paperIndexFromPointer(event, cell);
+  const start = unitToPoint(documentState.body, els.input.selectionStart);
+  const end = unitToPoint(documentState.body, els.input.selectionEnd);
+  if (start === end || index < start || index > end) selectOnPaper(index, index);
+  openPaperContextMenu(event.clientX, event.clientY);
+});
+els.contextMenu.addEventListener("click", async event => {
+  const action = event.target.closest("[data-edit-action]")?.dataset.editAction;
+  if (!action) return;
+  closePaperContextMenu();
+  try {
+    if (action === "copy" || action === "cut") {
+      const text = selectedText();
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      if (action === "cut") replaceSelection("");
+      else els.input.focus({ preventScroll: true });
+    } else if (action === "paste") {
+      replaceSelection(await navigator.clipboard.readText());
+    } else if (action === "delete") {
+      replaceSelection("");
+    } else if (action === "select-all") {
+      selectOnPaper(0, characters(documentState.body).length);
+    }
+  } catch {
+    showToast("クリップボードへのアクセスを許可してください");
+    els.input.focus({ preventScroll: true });
+  }
+});
+document.addEventListener("pointerdown", event => {
+  if (!els.contextMenu.hidden && !els.contextMenu.contains(event.target)) closePaperContextMenu();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") closePaperContextMenu();
+});
+window.addEventListener("blur", closePaperContextMenu);
+window.addEventListener("resize", closePaperContextMenu);
+window.addEventListener("scroll", closePaperContextMenu, true);
 els.paper.addEventListener("focus", () => focusAt(caret));
 els.input.addEventListener("beforeinput", () => {
   ensureHistory().pending = currentSnapshot();

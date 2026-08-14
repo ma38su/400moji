@@ -75,7 +75,7 @@
             <span id="pageCount">1 / 1</span>
             <button id="nextPage" aria-label="次のページ">→</button>
           </div>
-          <span id="viewHint" class="keyboard-hint">用紙をクリックして入力</span>
+          <span id="viewHint" class="keyboard-hint">ドラッグで選択・クリックして入力</span>
         </div>
         <div id="paper" class="paper" role="textbox" aria-label="縦書き原稿用紙" aria-multiline="true" tabindex="0"></div>
         <textarea id="input" class="input-proxy" aria-label="原稿本文" spellcheck="false"></textarea>
@@ -84,6 +84,15 @@
   </main>
 
   <section id="printPages" class="print-pages" aria-hidden="true"></section>
+
+  <div id="paperContextMenu" class="context-menu" role="menu" hidden>
+    <button type="button" role="menuitem" data-edit-action="copy">コピー</button>
+    <button type="button" role="menuitem" data-edit-action="cut">カット</button>
+    <button type="button" role="menuitem" data-edit-action="paste">ペースト</button>
+    <hr>
+    <button type="button" role="menuitem" data-edit-action="delete">削除</button>
+    <button type="button" role="menuitem" data-edit-action="select-all">すべて選択</button>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="nameDialog" class="name-dialog">
