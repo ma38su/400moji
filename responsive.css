@@ -1,0 +1,55 @@
+@media (max-width: 1160px) {
+  .workspace { grid-template-columns: 1fr; }
+  .sidebar { position: static; grid-template-columns: 1fr 1fr; }
+  .paper-heading { width: 92vw; }
+  .paper { --cell: calc((92vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20); }
+  .paper-wrap.edit-mode .input-proxy { width: 92vw; }
+  .keyboard-hint, .save-status { display:none; }
+}
+
+@media (min-width: 700px) and (max-width: 1180px) {
+  html, body { height: 100%; overflow: hidden; }
+  body { min-height: 100dvh; }
+  .topbar { height: 56px; padding: 0 18px; gap: 12px; }
+  .topbar .brand > span:last-child, .save-status, #printButton, .install-button { display: none; }
+  .actions { gap: 6px; }
+  .actions .button, .actions button { padding: 7px 10px; }
+  main { height: calc(100dvh - 56px); padding: 8px 2vw; overflow: hidden; }
+  .workspace { display: block; height: 100%; }
+  .sidebar { display: none; }
+  .paper-heading { width: 96vw; margin-bottom: 6px; min-height: 34px; }
+  .paper {
+    --binding: 40px; --column-gap: 3px; --paper-pad: 12px;
+    --cell: min(
+      calc((96vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20),
+      calc((100dvh - 56px - 8px - 34px - 6px - var(--paper-pad) * 2 - 4px) / 20)
+    );
+  }
+  .paper-wrap.edit-mode .input-proxy {
+    width: 96vw; height: calc(100dvh - 56px - 8px - 34px - 6px);
+    padding: 20px;
+  }
+}
+
+:fullscreen { background: var(--ground); }
+:fullscreen .topbar { position: relative; }
+:fullscreen main { padding-top: 8px; }
+
+@media (max-width: 600px) {
+  .topbar { padding: 0 3vw; gap: 8px; }
+  .brand > span:last-child, #printButton, .history-actions { display:none; }
+  .title-input { width: 100%; }
+  main { padding: 22px 2vw 50px; }
+  .sidebar { grid-template-columns: 1fr; }
+  .paper-heading { width: 96vw; }
+  .paper {
+    --binding: 28px; --column-gap: 2px; --paper-pad: 8px;
+    --cell: calc((96vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20);
+  }
+  .paper-wrap.edit-mode .input-proxy { width: 96vw; height: 70vh; padding: 18px; font-size: 19px; }
+  .keyboard-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper.page-turn-next, .paper.page-turn-previous { animation: none; }
+}

@@ -1,15 +1,21 @@
 import "./styles.css";
+import "./responsive.css";
+import "./print.css";
 import {
-  VERTICAL_PUNCTUATION, characters, pointToUnit, unitToPoint,
+  characters, pointToUnit, unitToPoint,
   layoutCharacters, indexAtOrNearSlot, selectionPoints, movePaperSelection,
   textInSelection, replaceTextSelection
 } from "./editor-logic.js";
-
-const STORAGE_KEY = "yonhyakuji.library.v2";
-const LEGACY_STORAGE_KEY = "yonhyakuji.document.v1";
-const PAGE_SIZE = 400;
-const HALF_WIDTH_REPLACEMENTS = { "(": "（", ")": "）" };
-let installPrompt;
+import { PAPER } from "./app-config.js";
+import {
+  normalizeVerticalText, normalizeName, createDocument as createLibraryDocument,
+  nameExists as libraryNameExists, uniqueName as uniqueLibraryName,
+  loadLibrary, saveLibrary
+} from "./document-library.js";
+import { createHistoryStore } from "./history-store.js";
+import { createPaperPage, pageCountForWriting } from "./paper-renderer.js";
+import { applyPrintPreset as syncPrintPreset, preparePrintPages as renderPrintPages } from "./print.js";
+import { setupPlatformFeatures } from "./platform.js";
 
 const els = {
   paper: document.querySelector("#paper"), input: document.querySelector("#input"),
@@ -39,33 +45,17 @@ let saveTimer;
 let nameDialogMode = "new";
 let viewMode = "paper";
 let paperSelectionAnchor = null;
-const histories = new Map();
+const historyStore = createHistoryStore();
 const documentPositions = new Map();
 
-function normalizeVerticalText(text) {
-  return String(text || "")
-    .replace(/\r\n?/g, "\n")
-    .replace(/[()]/g, character => HALF_WIDTH_REPLACEMENTS[character]);
-}
-function newId() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
-function normalizeName(name) { return String(name || "").trim(); }
 function nameExists(name, exceptId = null) {
-  const normalized = normalizeName(name);
-  return library.documents.some(document => document.id !== exceptId && document.title === normalized);
+  return libraryNameExists(library, name, exceptId);
 }
 function uniqueName(baseName) {
-  const base = normalizeName(baseName) || "無題の原稿";
-  if (!nameExists(base)) return base;
-  let number = 2;
-  while (nameExists(`${base} ${number}`)) number++;
-  return `${base} ${number}`;
+  return uniqueLibraryName(library, baseName);
 }
 function createDocument(title, source = {}) {
-  return {
-    id: newId(), title: normalizeName(title), body: normalizeVerticalText(source.body),
-    page: Number(source.page) || 0,
-    updatedAt: source.updatedAt || null
-  };
+  return createLibraryDocument(title, source);
 }
 function renderDocumentList() {
   const fragment = document.createDocumentFragment();
@@ -96,10 +86,7 @@ function applyActiveDocument() {
 }
 
 function applyPrintPreset() {
-  const preset = library.printPreset === "school-a4" ? "school-a4" : "jis-a4";
-  library.printPreset = preset;
-  els.printPreset.value = preset;
-  document.documentElement.dataset.printPreset = preset;
+  return syncPrintPreset(library, els.printPreset);
 }
 
 function currentSnapshot() {
@@ -110,8 +97,7 @@ function currentSnapshot() {
   };
 }
 function ensureHistory() {
-  if (!histories.has(documentState.id)) histories.set(documentState.id, { undo: [], redo: [], pending: null });
-  return histories.get(documentState.id);
+  return historyStore.ensure(documentState.id);
 }
 function updateHistoryButtons() {
   const history = ensureHistory();
@@ -123,23 +109,19 @@ function restoreSnapshot(snapshot) {
   els.input.value = snapshot.body;
   els.input.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
   caret = unitToPoint(documentState.body, snapshot.selectionStart);
-  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
+  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAPER.pageSize);
   scheduleSave();
   render();
 }
 function undo() {
-  const history = ensureHistory();
-  const snapshot = history.undo.pop();
+  const snapshot = historyStore.undo(documentState.id, currentSnapshot());
   if (!snapshot) return;
-  history.redo.push(currentSnapshot());
   restoreSnapshot(snapshot);
   updateHistoryButtons();
 }
 function redo() {
-  const history = ensureHistory();
-  const snapshot = history.redo.pop();
+  const snapshot = historyStore.redo(documentState.id, currentSnapshot());
   if (!snapshot) return;
-  history.undo.push(currentSnapshot());
   restoreSnapshot(snapshot);
   updateHistoryButtons();
 }
@@ -162,20 +144,9 @@ function setViewMode(mode, focus = true) {
   scheduleSave();
 }
 function load() {
-  try {
-    const savedLibrary = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (savedLibrary?.documents?.length) {
-      library = savedLibrary;
-    } else {
-      const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || "null") || {};
-      const migrated = createDocument(uniqueName(legacy.title || "無題の原稿"), legacy);
-      library = { activeId: migrated.id, documents: [migrated] };
-    }
-  } catch { showToast("保存データを読み込めませんでした"); }
-  if (!library.documents.length) {
-    const initial = createDocument("無題の原稿");
-    library = { activeId: initial.id, documents: [initial] };
-  }
+  const loaded = loadLibrary(localStorage);
+  library = loaded.library;
+  if (loaded.loadError) showToast("保存データを読み込めませんでした");
   applyActiveDocument();
   applyPrintPreset();
   setViewMode(library.viewMode || "paper", false);
@@ -191,7 +162,7 @@ function save() {
   documentState.updatedAt = new Date().toISOString();
   library.documents.forEach(savedDocument => delete savedDocument.caret);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
+    saveLibrary(localStorage, library);
     els.saveStatus.textContent = "保存済み";
   } catch { els.saveStatus.textContent = "保存できません"; }
 }
@@ -199,42 +170,18 @@ function render() {
   const chars = characters(documentState.body);
   const layout = layoutCharacters(chars);
   // 400字ちょうど埋まったときは、続けて書ける空白の次ページも用意する。
-  const pages = Math.max(1, Math.floor(layout.usedSlots / PAGE_SIZE) + 1);
+  const pages = pageCountForWriting(layout.usedSlots);
   const previousPage = renderedPage;
   page = Math.min(page, pages - 1);
   renderedPage = page;
-  const startSlot = page * PAGE_SIZE;
+  const startSlot = page * PAPER.pageSize;
   const selectionStart = unitToPoint(documentState.body, els.input.selectionStart);
   const selectionEnd = unitToPoint(documentState.body, els.input.selectionEnd);
-  const fragment = document.createDocumentFragment();
-  els.paper.replaceChildren();
-  for (let i = 0; i < PAGE_SIZE; i++) {
-    const cell = document.createElement("span");
-    cell.className = "cell";
-    const absoluteSlot = startSlot + i;
-    const entry = layout.slots[absoluteSlot];
-    const value = entry?.value || "";
-    cell.textContent = value;
-    if (VERTICAL_PUNCTUATION.has(value)) cell.classList.add("punctuation");
-    if (/^[A-Za-z]$/.test(value)) cell.classList.add("latin");
-    if (entry?.trailing) {
-      const trailing = document.createElement("span");
-      trailing.className = "line-end-punctuation";
-      trailing.textContent = entry.trailing;
-      cell.appendChild(trailing);
-    }
-    const column = 20 - Math.floor(i / 20);
-    // 10列目と11列目の間に、原稿用紙の綴じ代用トラックを空ける。
-    cell.style.gridColumn = String(column > 10 ? column + 1 : column);
-    cell.style.gridRow = String(i % 20 + 1);
-    const cellIndexes = [layout.slotToIndex[absoluteSlot], ...(entry?.trailingIndexes || [])];
-    if (cellIndexes.some(index => index >= selectionStart && index < selectionEnd)) cell.classList.add("selected");
-    if (absoluteSlot === layout.caretSlots[caret] && document.activeElement === els.input) cell.classList.add("caret");
-    if (absoluteSlot === layout.caretSlots[caret]) cell.classList.add("active");
-    cell.dataset.slot = absoluteSlot;
-    fragment.appendChild(cell);
-  }
-  els.paper.appendChild(fragment);
+  const renderedPaper = createPaperPage(layout, startSlot, {
+    selectionStart, selectionEnd, caret, interactive: true,
+    caretVisible: document.activeElement === els.input
+  });
+  els.paper.replaceChildren(...renderedPaper.childNodes);
   if (previousPage !== null && previousPage !== page && viewMode === "paper") {
     animatePageTurn(page > previousPage ? "next" : "previous");
   }
@@ -244,14 +191,14 @@ function render() {
     els.sheetCount.textContent = "1枚目・未入力";
   } else {
     const lastUsedSlot = layout.usedSlots - 1;
-    const usedSheet = Math.floor(lastUsedSlot / PAGE_SIZE) + 1;
-    const slotOnSheet = lastUsedSlot % PAGE_SIZE;
-    const usedColumn = Math.floor(slotOnSheet / 20) + 1;
-    const usedRow = slotOnSheet % 20 + 1;
+    const usedSheet = Math.floor(lastUsedSlot / PAPER.pageSize) + 1;
+    const slotOnSheet = lastUsedSlot % PAPER.pageSize;
+    const usedColumn = Math.floor(slotOnSheet / PAPER.rows) + 1;
+    const usedRow = slotOnSheet % PAPER.rows + 1;
     els.sheetCount.textContent = `${usedSheet}枚目・${usedColumn}行目の${usedRow}マス目まで`;
   }
   els.inputCharCount.textContent = `入力文字数: ${inputCharCount.toLocaleString("ja-JP")}文字`;
-  els.meterFill.style.width = `${Math.min(100, (layout.usedSlots % PAGE_SIZE || (layout.usedSlots ? PAGE_SIZE : 0)) / PAGE_SIZE * 100)}%`;
+  els.meterFill.style.width = `${Math.min(100, (layout.usedSlots % PAPER.pageSize || (layout.usedSlots ? PAPER.pageSize : 0)) / PAPER.pageSize * 100)}%`;
   els.pageCount.textContent = `${page + 1} / ${pages}`;
   els.prevPage.disabled = page === 0;
   els.nextPage.disabled = page === pages - 1;
@@ -265,50 +212,6 @@ function animatePageTurn(direction) {
   els.paper.classList.add(className);
 }
 
-function createPaperPage(layout, startSlot, className = "paper") {
-  const paper = document.createElement("div");
-  paper.className = className;
-  for (let i = 0; i < PAGE_SIZE; i++) {
-    const cell = document.createElement("span");
-    cell.className = "cell";
-    const entry = layout.slots[startSlot + i];
-    const value = entry?.value || "";
-    cell.textContent = value;
-    if (VERTICAL_PUNCTUATION.has(value)) cell.classList.add("punctuation");
-    if (/^[A-Za-z]$/.test(value)) cell.classList.add("latin");
-    if (entry?.trailing) {
-      const trailing = document.createElement("span");
-      trailing.className = "line-end-punctuation";
-      trailing.textContent = entry.trailing;
-      cell.appendChild(trailing);
-    }
-    const column = 20 - Math.floor(i / 20);
-    cell.style.gridColumn = String(column > 10 ? column + 1 : column);
-    cell.style.gridRow = String(i % 20 + 1);
-    paper.appendChild(cell);
-  }
-  return paper;
-}
-
-function preparePrintPages() {
-  const layout = layoutCharacters(characters(documentState.body));
-  const pageTotal = Math.max(1, Math.ceil(layout.usedSlots / PAGE_SIZE));
-  const fragment = document.createDocumentFragment();
-  for (let printPage = 0; printPage < pageTotal; printPage++) {
-    const sheet = document.createElement("article");
-    sheet.className = "print-sheet";
-    const heading = document.createElement("header");
-    heading.className = "print-heading";
-    const title = document.createElement("span");
-    title.textContent = documentState.title;
-    const number = document.createElement("span");
-    number.textContent = `${printPage + 1} / ${pageTotal}`;
-    heading.append(title, number);
-    sheet.append(heading, createPaperPage(layout, printPage * PAGE_SIZE, "paper print-paper"));
-    fragment.appendChild(sheet);
-  }
-  els.printPages.replaceChildren(fragment);
-}
 function focusAt(index) {
   caret = Math.max(0, Math.min(index, characters(documentState.body).length));
   els.input.focus({ preventScroll: true });
@@ -337,7 +240,7 @@ function selectOnPaper(anchor, focus) {
   );
   caret = focus;
   const layout = layoutCharacters(characters(documentState.body));
-  page = Math.floor(layout.caretSlots[caret] / PAGE_SIZE);
+  page = Math.floor(layout.caretSlots[caret] / PAPER.pageSize);
   scheduleSave();
   render();
 }
@@ -353,7 +256,7 @@ function selectedText() {
   return textInSelection(documentState.body, els.input.selectionStart, els.input.selectionEnd);
 }
 function replaceSelection(text) {
-  ensureHistory().pending = currentSnapshot();
+  historyStore.begin(documentState.id, currentSnapshot());
   els.input.focus({ preventScroll: true });
   const replacement = replaceTextSelection(
     els.input.value,
@@ -497,12 +400,9 @@ window.addEventListener("resize", closePaperContextMenu);
 window.addEventListener("scroll", closePaperContextMenu, true);
 els.paper.addEventListener("focus", () => focusAt(caret));
 els.input.addEventListener("beforeinput", () => {
-  ensureHistory().pending = currentSnapshot();
+  historyStore.begin(documentState.id, currentSnapshot());
 });
 els.input.addEventListener("input", () => {
-  const history = ensureHistory();
-  const previous = history.pending;
-  history.pending = null;
   const normalized = normalizeVerticalText(els.input.value);
   if (normalized !== els.input.value) {
     const selectionStart = els.input.selectionStart;
@@ -511,12 +411,9 @@ els.input.addEventListener("input", () => {
     els.input.setSelectionRange(selectionStart, selectionEnd);
   }
   documentState.body = normalized;
-  if (previous && previous.body !== documentState.body) {
-    history.undo.push(previous);
-    history.redo.length = 0;
-  }
+  historyStore.commit(documentState.id, documentState.body);
   caret = unitToPoint(documentState.body, els.input.selectionStart);
-  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
+  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAPER.pageSize);
   scheduleSave(); render(); updateHistoryButtons();
 });
 els.input.addEventListener("keydown", event => {
@@ -542,7 +439,7 @@ els.input.addEventListener("keydown", event => {
 });
 function syncCaretFromInput() {
   caret = paperSelectionPoints().focus;
-  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
+  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAPER.pageSize);
   scheduleSave(); render();
 }
 els.input.addEventListener("keyup", syncCaretFromInput);
@@ -584,7 +481,7 @@ els.title.addEventListener("blur", commitDocumentName);
 function moveToPage(targetPage) {
   const chars = characters(documentState.body);
   const layout = layoutCharacters(chars);
-  const targetSlot = targetPage * PAGE_SIZE;
+  const targetSlot = targetPage * PAPER.pageSize;
   page = targetPage;
   focusAt(layout.slotToIndex[targetSlot] ?? chars.length);
 }
@@ -653,61 +550,18 @@ document.querySelector("#importJson").addEventListener("change", async event => 
   event.target.value = "";
 });
 document.querySelector("#printButton").addEventListener("click", () => {
-  preparePrintPages();
+  renderPrintPages(els.printPages, documentState);
   window.print();
 });
-window.addEventListener("beforeprint", preparePrintPages);
+window.addEventListener("beforeprint", () => renderPrintPages(els.printPages, documentState));
 window.addEventListener("beforeunload", save);
 
-function fullscreenElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
-function updateFullscreenButton() {
-  const active = Boolean(fullscreenElement());
-  els.fullscreenButton.textContent = active ? "全画面を終了" : "全画面";
-  els.fullscreenButton.setAttribute("aria-pressed", String(active));
-}
-els.fullscreenButton.addEventListener("click", async () => {
-  try {
-    if (fullscreenElement()) {
-      const exit = document.exitFullscreen || document.webkitExitFullscreen;
-      await exit.call(document);
-    } else {
-      const request = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
-      if (!request) {
-        showToast("Safariの共有メニューからホーム画面に追加すると全画面で使えます");
-        return;
-      }
-      await request.call(document.documentElement);
-    }
-  } catch { showToast("全画面表示に切り替えられませんでした"); }
+setupPlatformFeatures({
+  fullscreenButton: els.fullscreenButton,
+  installButton: document.querySelector("#installApp"),
+  showToast,
+  enableServiceWorker: import.meta.env.PROD
 });
-document.addEventListener("fullscreenchange", updateFullscreenButton);
-document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
-
-const installButton = document.querySelector("#installApp");
-window.addEventListener("beforeinstallprompt", event => {
-  event.preventDefault();
-  installPrompt = event;
-  installButton.hidden = false;
-});
-installButton.addEventListener("click", async () => {
-  if (!installPrompt) return;
-  installButton.hidden = true;
-  await installPrompt.prompt();
-  installPrompt = null;
-});
-window.addEventListener("appinstalled", () => {
-  installPrompt = null;
-  installButton.hidden = true;
-  showToast("原稿用紙アプリ - 400mojiをインストールしました");
-});
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {
-      console.warn("オフライン機能を有効にできませんでした");
-    });
-  });
-}
 
 load();
 render();

@@ -1,4 +1,5 @@
-const CACHE_NAME = "400moji-v7";
+// 本番ビルドでは、Viteプラグインが成果物一覧のハッシュへ置き換える。
+const CACHE_NAME = "400moji-dev";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", event => {

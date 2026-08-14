@@ -81,6 +81,19 @@ npm test
 
 テスト後に `npm run build` も実行し、本番用バンドルが生成できることを確認してください。
 
+## コード構成
+
+- `app.js`: 画面状態とイベントの統合
+- `app-config.js`: 原稿用紙・印刷プリセットの共通設定
+- `document-library.js`: 原稿の作成、命名、保存、旧形式からの移行
+- `editor-logic.js`: 文字配置、選択、カーソル移動の純粋ロジック
+- `history-store.js`: Undo・Redo履歴
+- `paper-renderer.js`: 原稿用紙のDOM生成
+- `print.js`: 印刷ページと印刷プリセット
+- `platform.js`: PWAインストール、全画面、Service Worker登録
+- `styles.css` / `responsive.css` / `print.css`: 通常、端末別、印刷のスタイル
+- `scripts/service-worker-build.js`: ビルド成果物からオフラインキャッシュを生成
+
 ## GitHub Pagesへの公開
 
 `main` ブランチへpushすると、GitHub Actionsが自動的にビルドし、GitHub Pagesへデプロイします。

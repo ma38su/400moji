@@ -83,3 +83,16 @@ test("選択範囲へペーストし、挿入文字列の直後へカーソル�
     text: "あ文章😀う", caret: 5
   });
 });
+
+test("20マス目の句読点を行末文字と同じマスへ配置する", () => {
+  const layout = layoutCharacters(characters(`${"あ".repeat(20)}。`));
+  assert.equal(layout.usedSlots, 20);
+  assert.equal(layout.slots[19].trailing, "。");
+  assert.deepEqual(layout.slots[19].trailingIndexes, [20]);
+});
+
+test("連続改行は空の縦列を確保する", () => {
+  const layout = layoutCharacters(characters("あ\n\nい"));
+  assert.equal(layout.caretSlots[3], 40);
+  assert.equal(layout.slots[40].value, "い");
+});

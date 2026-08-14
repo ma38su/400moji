@@ -1,3 +1,5 @@
+import { PAPER } from "./app-config.js";
+
 export const VERTICAL_PUNCTUATION = new Set(["。", "、"]);
 
 export function characters(text) {
@@ -21,14 +23,14 @@ export function layoutCharacters(chars) {
   chars.forEach((value, index) => {
     caretSlots[index] = slot;
     if (value === "\n") {
-      const columnOffset = slot % 20;
+      const columnOffset = slot % PAPER.rows;
       const startsBlankColumn = columnOffset === 0 && (index === 0 || chars[index - 1] === "\n");
-      const remaining = columnOffset === 0 ? (startsBlankColumn ? 20 : 0) : 20 - columnOffset;
+      const remaining = columnOffset === 0 ? (startsBlankColumn ? PAPER.rows : 0) : PAPER.rows - columnOffset;
       for (let skipped = 0; skipped < remaining; skipped++) slotToIndex[slot + skipped] = index;
       slot += remaining;
       return;
     }
-    if (VERTICAL_PUNCTUATION.has(value) && slot > 0 && slot % 20 === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
+    if (VERTICAL_PUNCTUATION.has(value) && slot > 0 && slot % PAPER.rows === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
       slots[slot - 1].trailing = `${slots[slot - 1].trailing || ""}${value}`;
       (slots[slot - 1].trailingIndexes ||= []).push(index);
       return;
@@ -80,7 +82,7 @@ export function replaceTextSelection(text, selectionStart, selectionEnd, replace
 
 export function movePaperSelection(text, selection, key, extend) {
   const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[key];
-  const columnMovement = { ArrowLeft: 20, ArrowRight: -20 }[key];
+  const columnMovement = { ArrowLeft: PAPER.rows, ArrowRight: -PAPER.rows }[key];
   const movement = characterMovement || columnMovement;
   if (!movement) return null;
 
