@@ -24,6 +24,10 @@
       <span id="saveStatus" class="save-status">保存済み</span>
     </div>
     <div class="actions">
+      <div class="history-actions" aria-label="編集履歴">
+        <button id="undoButton" class="button icon-button" type="button" aria-label="元に戻す" title="元に戻す（Ctrl/Cmd+Z）" disabled>↶</button>
+        <button id="redoButton" class="button icon-button" type="button" aria-label="やり直す" title="やり直す（Ctrl/Cmd+Shift+Z）" disabled>↷</button>
+      </div>
       <button id="installApp" class="button install-button" type="button" hidden>アプリをインストール</button>
       <button id="fullscreenButton" class="button" type="button" aria-pressed="false">全画面</button>
       <details class="menu">
@@ -77,6 +81,8 @@
       </div>
     </section>
   </main>
+
+  <section id="printPages" class="print-pages" aria-hidden="true"></section>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="nameDialog" class="name-dialog">

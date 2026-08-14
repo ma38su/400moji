@@ -32,6 +32,9 @@ button, summary { cursor: pointer; }
 .title-input:focus { outline: 0; border-color: var(--red); }
 .save-status { color: var(--muted); font: 12px system-ui, sans-serif; white-space: nowrap; }
 .actions { display: flex; gap: 8px; align-items: center; }
+.history-actions { display: flex; gap: 4px; }
+.icon-button { min-width: 34px; padding-inline: 9px; font: 18px/1 system-ui, sans-serif; }
+.icon-button:disabled { opacity: .35; cursor: default; }
 .button, .text-button, .actions button, .file-label { border: 1px solid var(--line); background: #fffaf2; border-radius: 6px; padding: 8px 13px; font-size: 13px; }
 .text-button { border-color: transparent; background: transparent; }
 .button.primary { background: var(--ink); color: white; border-color: var(--ink); }
@@ -150,6 +153,7 @@ main { padding: 36px 4vw 64px; }
 .name-dialog { width: min(420px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); box-shadow: 0 24px 70px #2c241c38; }
 .name-dialog::backdrop { background: rgba(40,37,31,.28); backdrop-filter: blur(2px); }
 .name-dialog form { display: grid; gap: 12px; padding: 24px; }
+.print-pages { display: none; }
 .name-dialog h2 { margin: 0 0 4px; font-size: 20px; font-weight: 500; }
 .name-dialog label { color: var(--muted); font: 12px system-ui,sans-serif; }
 .name-dialog input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: white; font: 15px system-ui,sans-serif; }
@@ -195,7 +199,7 @@ main { padding: 36px 4vw 64px; }
 :fullscreen main { padding-top: 8px; }
 @media (max-width: 600px) {
   .topbar { padding: 0 3vw; gap: 8px; }
-  .brand > span:last-child, #printButton { display:none; }
+  .brand > span:last-child, #printButton, .history-actions { display:none; }
   .title-input { width: 100%; }
   main { padding: 22px 2vw 50px; }
   .sidebar { grid-template-columns: 1fr; }
@@ -208,11 +212,26 @@ main { padding: 36px 4vw 64px; }
   .keyboard-hint { display: none; }
 }
 @media print {
-  .topbar, .sidebar, .paper-heading, .toast, .name-dialog { display:none !important; }
-  body, main { background:white; padding:0; }
-  .workspace { display:block; }
-  .paper { box-shadow:none; margin: 10mm auto; --cell: 8.5mm; print-color-adjust: exact; }
-  .paper-wrap.edit-mode .paper { display:grid; }
-  .paper-wrap.edit-mode .input-proxy { display:none; }
+  @page { size: A4 landscape; margin: 0; }
+  .topbar, main, .toast, .name-dialog { display:none !important; }
+  html, body { width: 297mm; min-width: 0; margin: 0; background: white; }
+  .print-pages { display: block; }
+  .print-sheet {
+    width: 297mm; height: 210mm; padding: 9mm 14mm 8mm;
+    break-after: page; page-break-after: always; overflow: hidden;
+  }
+  .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+  .print-heading {
+    width: 254mm; height: 8mm; margin: 0 auto 3mm;
+    display: flex; justify-content: space-between; align-items: start;
+    color: var(--ink); font: 9pt/1.2 system-ui, sans-serif;
+  }
+  .print-paper {
+    --cell: 8.2mm; --binding: 14mm; --column-gap: 1mm; --paper-pad: 5mm;
+    width: calc(var(--cell) * 20 + var(--binding) + var(--column-gap) * 20 + var(--paper-pad) * 2);
+    height: calc(var(--cell) * 20 + var(--paper-pad) * 2);
+    max-width: none; margin: 0 auto; box-shadow: none;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
   .cell.caret::after, .cell.active { display:none; background:none; }
 }

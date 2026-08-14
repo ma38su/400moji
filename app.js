@@ -4,6 +4,7 @@ const STORAGE_KEY = "yonhyakuji.library.v2";
 const LEGACY_STORAGE_KEY = "yonhyakuji.document.v1";
 const PAGE_SIZE = 400;
 const VERTICAL_PUNCTUATION = new Set(["。", "、"]);
+const HALF_WIDTH_REPLACEMENTS = { "(": "（", ")": "）" };
 let installPrompt;
 
 const els = {
@@ -19,7 +20,9 @@ const els = {
   nameDialogTitle: document.querySelector("#nameDialogTitle"), documentName: document.querySelector("#documentName"),
   nameError: document.querySelector("#nameError"), paperWrap: document.querySelector(".paper-wrap"),
   paperViewButton: document.querySelector("#paperViewButton"), editViewButton: document.querySelector("#editViewButton"),
-  viewHint: document.querySelector("#viewHint"), fullscreenButton: document.querySelector("#fullscreenButton")
+  viewHint: document.querySelector("#viewHint"), fullscreenButton: document.querySelector("#fullscreenButton"),
+  undoButton: document.querySelector("#undoButton"), redoButton: document.querySelector("#redoButton"),
+  printPages: document.querySelector("#printPages")
 };
 
 let library = { activeId: "", documents: [] };
@@ -29,8 +32,12 @@ let caret = 0;
 let saveTimer;
 let nameDialogMode = "new";
 let viewMode = "paper";
+const histories = new Map();
 
 function characters(text) { return Array.from(text.replace(/\r/g, "")); }
+function normalizeVerticalText(text) {
+  return String(text || "").replace(/[()]/g, character => HALF_WIDTH_REPLACEMENTS[character]);
+}
 function pointToUnit(text, point) { return characters(text).slice(0, point).join("").length; }
 function unitToPoint(text, unit) { return characters(text.slice(0, unit)).length; }
 function layoutCharacters(chars) {
@@ -94,7 +101,7 @@ function uniqueName(baseName) {
 }
 function createDocument(title, source = {}) {
   return {
-    id: newId(), title: normalizeName(title), body: String(source.body || ""),
+    id: newId(), title: normalizeName(title), body: normalizeVerticalText(source.body),
     caret: Number(source.caret) || 0, page: Number(source.page) || 0,
     updatedAt: source.updatedAt || null
   };
@@ -114,11 +121,56 @@ function applyActiveDocument() {
   documentState = library.documents.find(document => document.id === library.activeId) || library.documents[0];
   library.activeId = documentState.id;
   els.title.value = documentState.title;
+  documentState.body = normalizeVerticalText(documentState.body);
   els.input.value = documentState.body;
   const length = characters(documentState.body).length;
   caret = Math.max(0, Math.min(Number(documentState.caret) || 0, length));
   page = Math.max(0, Number(documentState.page) || 0);
   renderDocumentList();
+  ensureHistory();
+  updateHistoryButtons();
+}
+
+function currentSnapshot() {
+  return {
+    body: documentState.body,
+    selectionStart: els.input.selectionStart,
+    selectionEnd: els.input.selectionEnd
+  };
+}
+function ensureHistory() {
+  if (!histories.has(documentState.id)) histories.set(documentState.id, { undo: [], redo: [], pending: null });
+  return histories.get(documentState.id);
+}
+function updateHistoryButtons() {
+  const history = ensureHistory();
+  els.undoButton.disabled = history.undo.length === 0;
+  els.redoButton.disabled = history.redo.length === 0;
+}
+function restoreSnapshot(snapshot) {
+  documentState.body = snapshot.body;
+  els.input.value = snapshot.body;
+  els.input.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+  caret = unitToPoint(documentState.body, snapshot.selectionStart);
+  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
+  scheduleSave();
+  render();
+}
+function undo() {
+  const history = ensureHistory();
+  const snapshot = history.undo.pop();
+  if (!snapshot) return;
+  history.redo.push(currentSnapshot());
+  restoreSnapshot(snapshot);
+  updateHistoryButtons();
+}
+function redo() {
+  const history = ensureHistory();
+  const snapshot = history.redo.pop();
+  if (!snapshot) return;
+  history.undo.push(currentSnapshot());
+  restoreSnapshot(snapshot);
+  updateHistoryButtons();
 }
 function setViewMode(mode, focus = true) {
   viewMode = mode === "edit" ? "edit" : "paper";
@@ -223,6 +275,51 @@ function render() {
   els.prevPage.disabled = page === 0;
   els.nextPage.disabled = page === pages - 1;
 }
+
+function createPaperPage(layout, startSlot, className = "paper") {
+  const paper = document.createElement("div");
+  paper.className = className;
+  for (let i = 0; i < PAGE_SIZE; i++) {
+    const cell = document.createElement("span");
+    cell.className = "cell";
+    const entry = layout.slots[startSlot + i];
+    const value = entry?.value || "";
+    cell.textContent = value;
+    if (VERTICAL_PUNCTUATION.has(value)) cell.classList.add("punctuation");
+    if (/^[A-Za-z]$/.test(value)) cell.classList.add("latin");
+    if (entry?.trailing) {
+      const trailing = document.createElement("span");
+      trailing.className = "line-end-punctuation";
+      trailing.textContent = entry.trailing;
+      cell.appendChild(trailing);
+    }
+    const column = 20 - Math.floor(i / 20);
+    cell.style.gridColumn = String(column > 10 ? column + 1 : column);
+    cell.style.gridRow = String(i % 20 + 1);
+    paper.appendChild(cell);
+  }
+  return paper;
+}
+
+function preparePrintPages() {
+  const layout = layoutCharacters(characters(documentState.body));
+  const pageTotal = Math.max(1, Math.ceil(layout.usedSlots / PAGE_SIZE));
+  const fragment = document.createDocumentFragment();
+  for (let printPage = 0; printPage < pageTotal; printPage++) {
+    const sheet = document.createElement("article");
+    sheet.className = "print-sheet";
+    const heading = document.createElement("header");
+    heading.className = "print-heading";
+    const title = document.createElement("span");
+    title.textContent = documentState.title;
+    const number = document.createElement("span");
+    number.textContent = `${printPage + 1} / ${pageTotal}`;
+    heading.append(title, number);
+    sheet.append(heading, createPaperPage(layout, printPage * PAGE_SIZE, "paper print-paper"));
+    fragment.appendChild(sheet);
+  }
+  els.printPages.replaceChildren(fragment);
+}
 function focusAt(index) {
   caret = Math.max(0, Math.min(index, characters(documentState.body).length));
   els.input.focus({ preventScroll: true });
@@ -276,13 +373,41 @@ els.paper.addEventListener("click", event => {
   focusAt(cell ? Number(cell.dataset.index) : caret);
 });
 els.paper.addEventListener("focus", () => focusAt(caret));
+els.input.addEventListener("beforeinput", () => {
+  ensureHistory().pending = currentSnapshot();
+});
 els.input.addEventListener("input", () => {
-  documentState.body = els.input.value;
+  const history = ensureHistory();
+  const previous = history.pending;
+  history.pending = null;
+  const normalized = normalizeVerticalText(els.input.value);
+  if (normalized !== els.input.value) {
+    const selectionStart = els.input.selectionStart;
+    const selectionEnd = els.input.selectionEnd;
+    els.input.value = normalized;
+    els.input.setSelectionRange(selectionStart, selectionEnd);
+  }
+  documentState.body = normalized;
+  if (previous && previous.body !== documentState.body) {
+    history.undo.push(previous);
+    history.redo.length = 0;
+  }
   caret = unitToPoint(documentState.body, els.input.selectionStart);
   page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
-  scheduleSave(); render();
+  scheduleSave(); render(); updateHistoryButtons();
 });
 els.input.addEventListener("keydown", event => {
+  const modifier = event.metaKey || event.ctrlKey;
+  if (modifier && !event.altKey && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    event.shiftKey ? redo() : undo();
+    return;
+  }
+  if (modifier && !event.altKey && event.key.toLowerCase() === "y") {
+    event.preventDefault();
+    redo();
+    return;
+  }
   if (viewMode === "edit") return;
   if (event.isComposing || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
   const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[event.key];
@@ -317,6 +442,8 @@ els.input.addEventListener("blur", render);
 els.documentSelect.addEventListener("change", () => activateDocument(els.documentSelect.value));
 els.paperViewButton.addEventListener("click", () => setViewMode("paper"));
 els.editViewButton.addEventListener("click", () => setViewMode("edit"));
+els.undoButton.addEventListener("click", undo);
+els.redoButton.addEventListener("click", redo);
 function commitDocumentName() {
   const nextName = normalizeName(els.title.value);
   if (!nextName) {
@@ -392,7 +519,11 @@ document.querySelector("#importJson").addEventListener("change", async event => 
   } catch { showToast("このJSONは読み込めません"); }
   event.target.value = "";
 });
-document.querySelector("#printButton").addEventListener("click", () => window.print());
+document.querySelector("#printButton").addEventListener("click", () => {
+  preparePrintPages();
+  window.print();
+});
+window.addEventListener("beforeprint", preparePrintPages);
 window.addEventListener("beforeunload", save);
 
 function fullscreenElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
