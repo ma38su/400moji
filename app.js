@@ -33,6 +33,7 @@ let saveTimer;
 let nameDialogMode = "new";
 let viewMode = "paper";
 const histories = new Map();
+const documentPositions = new Map();
 
 function characters(text) { return Array.from(text.replace(/\r/g, "")); }
 function normalizeVerticalText(text) {
@@ -102,7 +103,7 @@ function uniqueName(baseName) {
 function createDocument(title, source = {}) {
   return {
     id: newId(), title: normalizeName(title), body: normalizeVerticalText(source.body),
-    caret: Number(source.caret) || 0, page: Number(source.page) || 0,
+    page: Number(source.page) || 0,
     updatedAt: source.updatedAt || null
   };
 }
@@ -120,11 +121,12 @@ function renderDocumentList() {
 function applyActiveDocument() {
   documentState = library.documents.find(document => document.id === library.activeId) || library.documents[0];
   library.activeId = documentState.id;
+  delete documentState.caret;
   els.title.value = documentState.title;
   documentState.body = normalizeVerticalText(documentState.body);
   els.input.value = documentState.body;
   const length = characters(documentState.body).length;
-  caret = Math.max(0, Math.min(Number(documentState.caret) || 0, length));
+  caret = Math.max(0, Math.min(documentPositions.get(documentState.id) || 0, length));
   page = Math.max(0, Number(documentState.page) || 0);
   renderDocumentList();
   ensureHistory();
@@ -214,9 +216,10 @@ function scheduleSave() {
   saveTimer = setTimeout(save, 350);
 }
 function save() {
-  documentState.caret = caret;
+  documentPositions.set(documentState.id, caret);
   documentState.page = page;
   documentState.updatedAt = new Date().toISOString();
+  library.documents.forEach(savedDocument => delete savedDocument.caret);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
     els.saveStatus.textContent = "保存済み";
@@ -512,7 +515,7 @@ els.nameForm.addEventListener("submit", event => {
   const name = normalizeName(els.documentName.value);
   if (!name) { els.nameError.textContent = "ファイル名を入力してください"; return; }
   if (nameExists(name)) { els.nameError.textContent = "同じ名前のファイルがあります"; return; }
-  const source = nameDialogMode === "duplicate" ? { ...documentState, caret: 0, page: 0 } : {};
+  const source = nameDialogMode === "duplicate" ? { ...documentState, page: 0 } : {};
   els.nameDialog.close();
   addAndActivate(createDocument(name, source));
 });
@@ -526,7 +529,7 @@ document.querySelector("#importJson").addEventListener("change", async event => 
     if (typeof imported.body !== "string") throw new Error();
     const name = normalizeName(imported.title || file.name.replace(/\.json$/i, "") || "読み込んだ原稿");
     if (nameExists(name)) { showToast("同じ名前のファイルがあります"); return; }
-    addAndActivate(createDocument(name, { ...imported, caret: 0, page: 0 }));
+    addAndActivate(createDocument(name, { ...imported, page: 0 }));
     showToast("原稿を読み込みました");
   } catch { showToast("このJSONは読み込めません"); }
   event.target.value = "";
