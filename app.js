@@ -26,7 +26,8 @@ const els = {
   paperViewButton: document.querySelector("#paperViewButton"), editViewButton: document.querySelector("#editViewButton"),
   viewHint: document.querySelector("#viewHint"), fullscreenButton: document.querySelector("#fullscreenButton"),
   undoButton: document.querySelector("#undoButton"), redoButton: document.querySelector("#redoButton"),
-  printPages: document.querySelector("#printPages"), contextMenu: document.querySelector("#paperContextMenu")
+  printPages: document.querySelector("#printPages"), contextMenu: document.querySelector("#paperContextMenu"),
+  printPreset: document.querySelector("#printPreset")
 };
 
 let library = { activeId: "", documents: [] };
@@ -92,6 +93,13 @@ function applyActiveDocument() {
   renderDocumentList();
   ensureHistory();
   updateHistoryButtons();
+}
+
+function applyPrintPreset() {
+  const preset = library.printPreset === "school-a4" ? "school-a4" : "jis-a4";
+  library.printPreset = preset;
+  els.printPreset.value = preset;
+  document.documentElement.dataset.printPreset = preset;
 }
 
 function currentSnapshot() {
@@ -169,6 +177,7 @@ function load() {
     library = { activeId: initial.id, documents: [initial] };
   }
   applyActiveDocument();
+  applyPrintPreset();
   setViewMode(library.viewMode || "paper", false);
 }
 function scheduleSave() {
@@ -544,6 +553,12 @@ els.paperViewButton.addEventListener("click", () => setViewMode("paper"));
 els.editViewButton.addEventListener("click", () => setViewMode("edit"));
 els.undoButton.addEventListener("click", undo);
 els.redoButton.addEventListener("click", redo);
+els.printPreset.addEventListener("change", () => {
+  library.printPreset = els.printPreset.value;
+  applyPrintPreset();
+  scheduleSave();
+  showToast(els.printPreset.value === "jis-a4" ? "JIS寸法で印刷します" : "学校向け9mmマスで印刷します");
+});
 function commitDocumentName() {
   const nextName = normalizeName(els.title.value);
   if (!nextName) {

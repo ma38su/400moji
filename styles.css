@@ -48,6 +48,8 @@ button, summary { cursor: pointer; }
 .menu-panel button:hover, .file-label:hover { background: #f1eadf; }
 .menu-panel hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--line); }
 .file-label input { display: none; }
+.print-preset-label { display: grid; gap: 6px; padding: 9px 10px 7px; color: var(--muted); font: 11px system-ui,sans-serif; }
+.print-preset-label select { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 5px; background: white; color: var(--ink); font: 12px system-ui,sans-serif; }
 
 main { padding: 36px 4vw 64px; }
 .workspace { display: grid; grid-template-columns: 220px minmax(520px, 800px); justify-content: center; align-items: start; gap: 32px; }
@@ -255,19 +257,31 @@ main { padding: 36px 4vw 64px; }
     width: 297mm; height: auto; min-width: 0; min-height: 0;
     margin: 0; overflow: visible; background: white;
   }
-  .print-pages { display: block; width: 297mm; overflow: visible; }
+  .print-pages {
+    --print-cell: 8.5mm;
+    --print-gap: 3.5mm;
+    --print-binding: 14mm;
+    --print-paper-pad: 5mm;
+    --print-paper-width: calc(var(--print-cell) * 20 + var(--print-binding) + var(--print-gap) * 20 + var(--print-paper-pad) * 2);
+    display: block; width: 297mm; overflow: visible;
+  }
+  html[data-print-preset="school-a4"] .print-pages {
+    --print-cell: 9mm;
+    --print-gap: 3mm;
+    --print-paper-pad: 2mm;
+  }
   .print-sheet {
-    width: 297mm; height: 210mm; padding: 9mm 14mm 8mm;
+    width: 297mm; height: 210mm; padding: 7mm 10mm 5mm;
     break-after: page; page-break-after: always; overflow: hidden;
   }
   .print-sheet:last-child { break-after: auto; page-break-after: auto; }
   .print-heading {
-    width: 254mm; height: 8mm; margin: 0 auto 3mm;
+    width: var(--print-paper-width); height: 7mm; margin: 0 auto 2mm;
     display: flex; justify-content: space-between; align-items: start;
     color: var(--ink); font: 9pt/1.2 system-ui, sans-serif;
   }
   .print-paper {
-    --cell: 8.2mm; --binding: 14mm; --column-gap: 1mm; --paper-pad: 5mm;
+    --cell: var(--print-cell); --binding: var(--print-binding); --column-gap: var(--print-gap); --paper-pad: var(--print-paper-pad);
     width: calc(var(--cell) * 20 + var(--binding) + var(--column-gap) * 20 + var(--paper-pad) * 2);
     height: calc(var(--cell) * 20 + var(--paper-pad) * 2);
     max-width: none; margin: 0 auto; box-shadow: none;
