@@ -355,8 +355,20 @@ function selectOnPaper(anchor, focus) {
     direction
   );
   caret = focus;
+  const layout = layoutCharacters(characters(documentState.body));
+  page = Math.floor(layout.caretSlots[caret] / PAGE_SIZE);
   scheduleSave();
   render();
+}
+function paperSelectionPoints() {
+  const start = unitToPoint(documentState.body, els.input.selectionStart);
+  const end = unitToPoint(documentState.body, els.input.selectionEnd);
+  const backward = els.input.selectionDirection === "backward";
+  return {
+    start, end,
+    anchor: backward ? end : start,
+    focus: backward ? start : end
+  };
 }
 function selectedText() {
   return documentState.body.slice(els.input.selectionStart, els.input.selectionEnd);
@@ -530,13 +542,20 @@ els.input.addEventListener("keydown", event => {
     return;
   }
   if (viewMode === "edit") return;
-  if (event.isComposing || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
+  if (event.isComposing || event.altKey || event.metaKey || event.ctrlKey) return;
+  const selection = paperSelectionPoints();
   const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[event.key];
   if (characterMovement) {
-    const targetIndex = caret + characterMovement;
+    if (!event.shiftKey && selection.start !== selection.end) {
+      event.preventDefault();
+      focusAt(characterMovement < 0 ? selection.start : selection.end);
+      return;
+    }
+    const targetIndex = selection.focus + characterMovement;
     if (targetIndex < 0 || targetIndex > characters(documentState.body).length) return;
     event.preventDefault();
-    focusAt(targetIndex);
+    if (event.shiftKey) selectOnPaper(selection.anchor, targetIndex);
+    else focusAt(targetIndex);
     return;
   }
 
@@ -545,15 +564,22 @@ els.input.addEventListener("keydown", event => {
 
   const chars = characters(documentState.body);
   const layout = layoutCharacters(chars);
-  const currentSlot = layout.caretSlots[caret];
+  if (!event.shiftKey && selection.start !== selection.end) {
+    event.preventDefault();
+    focusAt(movement < 0 ? selection.start : selection.end);
+    return;
+  }
+  const currentSlot = layout.caretSlots[selection.focus];
   const targetSlot = currentSlot + movement;
   if (targetSlot < 0 || targetSlot > layout.usedSlots) return;
 
   event.preventDefault();
-  focusAt(indexAtOrNearSlot(layout, targetSlot, Math.sign(movement)));
+  const targetIndex = indexAtOrNearSlot(layout, targetSlot, Math.sign(movement));
+  if (event.shiftKey) selectOnPaper(selection.anchor, targetIndex);
+  else focusAt(targetIndex);
 });
 function syncCaretFromInput() {
-  caret = unitToPoint(documentState.body, els.input.selectionStart);
+  caret = paperSelectionPoints().focus;
   page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAGE_SIZE);
   scheduleSave(); render();
 }
