@@ -237,7 +237,6 @@ function render() {
     const absoluteSlot = startSlot + i;
     const entry = layout.slots[absoluteSlot];
     const value = entry?.value || "";
-    const index = entry?.index ?? layout.slotToIndex[absoluteSlot] ?? chars.length;
     cell.textContent = value;
     if (VERTICAL_PUNCTUATION.has(value)) cell.classList.add("punctuation");
     if (/^[A-Za-z]$/.test(value)) cell.classList.add("latin");
@@ -253,7 +252,7 @@ function render() {
     cell.style.gridRow = String(i % 20 + 1);
     if (absoluteSlot === layout.caretSlots[caret] && document.activeElement === els.input) cell.classList.add("caret");
     if (absoluteSlot === layout.caretSlots[caret]) cell.classList.add("active");
-    cell.dataset.index = index;
+    cell.dataset.slot = absoluteSlot;
     fragment.appendChild(cell);
   }
   els.paper.appendChild(fragment);
@@ -368,9 +367,22 @@ function openNameDialog(mode) {
   els.documentName.select();
 }
 
-els.paper.addEventListener("click", event => {
+els.paper.addEventListener("pointerdown", event => {
+  if (event.button !== 0) return;
   const cell = event.target.closest(".cell");
-  focusAt(cell ? Number(cell.dataset.index) : caret);
+  if (!cell) {
+    focusAt(caret);
+    return;
+  }
+
+  event.preventDefault();
+  const chars = characters(documentState.body);
+  const layout = layoutCharacters(chars);
+  const slot = Number(cell.dataset.slot);
+  const rect = cell.getBoundingClientRect();
+  const clickedAfterCharacter = event.clientY >= rect.top + rect.height / 2;
+  const targetSlot = clickedAfterCharacter ? slot + 1 : slot;
+  focusAt(indexAtOrNearSlot(layout, targetSlot, clickedAfterCharacter ? 1 : -1));
 });
 els.paper.addEventListener("focus", () => focusAt(caret));
 els.input.addEventListener("beforeinput", () => {

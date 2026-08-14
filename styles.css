@@ -90,7 +90,7 @@ main { padding: 36px 4vw 64px; }
   font-size: calc(var(--cell) * .67); line-height: 1;
   writing-mode: vertical-rl; text-orientation: mixed;
   font-feature-settings: "vert" 1, "vrt2" 1;
-  user-select: none;
+  user-select: none; cursor: text;
 }
 .cell.punctuation {
   place-items: start end;
