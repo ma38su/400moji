@@ -521,6 +521,24 @@ els.nameForm.addEventListener("submit", event => {
 });
 document.querySelector("#exportText").addEventListener("click", () => download(`${safeName()}.txt`, documentState.body, "text/plain;charset=utf-8"));
 document.querySelector("#exportJson").addEventListener("click", () => download(`${safeName()}.json`, JSON.stringify(documentState, null, 2), "application/json"));
+document.querySelector("#importText").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.querySelector(".menu").removeAttribute("open");
+  try {
+    const name = normalizeName(file.name.replace(/\.txt$/i, "") || "読み込んだ原稿");
+    if (nameExists(name)) {
+      showToast("同じ名前のファイルがあります");
+      return;
+    }
+    addAndActivate(createDocument(name, { body: await file.text() }));
+    showToast("TXTから原稿を読み込みました");
+  } catch {
+    showToast("このTXTは読み込めません");
+  } finally {
+    event.target.value = "";
+  }
+});
 document.querySelector("#importJson").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
