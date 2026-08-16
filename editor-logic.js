@@ -1,6 +1,14 @@
 import { PAPER } from "./app-config.js";
 
 export const VERTICAL_PUNCTUATION = new Set(["。", "、"]);
+export const LINE_START_PROHIBITED = new Set([
+  "、", "。", "・", "ー", "！", "？", "」", "』", "）", "】", "］", "〉", "》", "〕",
+  "々", "ゝ", "ゞ", "ヽ", "ヾ"
+]);
+export const SMALL_KANA = new Set([
+  "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "っ", "ゃ", "ゅ", "ょ", "ゎ", "ゕ", "ゖ",
+  "ァ", "ィ", "ゥ", "ェ", "ォ", "ッ", "ャ", "ュ", "ョ", "ヮ", "ヵ", "ヶ"
+]);
 
 export function characters(text) {
   return Array.from(String(text).replace(/\r/g, ""));
@@ -14,7 +22,8 @@ export function unitToPoint(text, unit) {
   return characters(String(text).slice(0, unit)).length;
 }
 
-export function layoutCharacters(chars) {
+export function layoutCharacters(chars, options = {}) {
+  const { prohibitSmallKanaAtLineStart = false } = options;
   const slots = [];
   const caretSlots = new Array(chars.length + 1);
   const slotToIndex = [];
@@ -30,7 +39,9 @@ export function layoutCharacters(chars) {
       slot += remaining;
       return;
     }
-    if (VERTICAL_PUNCTUATION.has(value) && slot > 0 && slot % PAPER.rows === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
+    const prohibitedAtLineStart = LINE_START_PROHIBITED.has(value)
+      || (prohibitSmallKanaAtLineStart && SMALL_KANA.has(value));
+    if (prohibitedAtLineStart && slot > 0 && slot % PAPER.rows === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
       slots[slot - 1].trailing = `${slots[slot - 1].trailing || ""}${value}`;
       (slots[slot - 1].trailingIndexes ||= []).push(index);
       return;
@@ -80,7 +91,7 @@ export function replaceTextSelection(text, selectionStart, selectionEnd, replace
   };
 }
 
-export function movePaperSelection(text, selection, key, extend) {
+export function movePaperSelection(text, selection, key, extend, layoutOptions = {}) {
   const characterMovement = { ArrowUp: -1, ArrowDown: 1 }[key];
   const columnMovement = { ArrowLeft: PAPER.rows, ArrowRight: -PAPER.rows }[key];
   const movement = characterMovement || columnMovement;
@@ -95,7 +106,7 @@ export function movePaperSelection(text, selection, key, extend) {
   if (characterMovement) {
     focus = Math.max(0, Math.min(focus + characterMovement, characters(text).length));
   } else {
-    const layout = layoutCharacters(characters(text));
+    const layout = layoutCharacters(characters(text), layoutOptions);
     const targetSlot = layout.caretSlots[focus] + columnMovement;
     if (targetSlot >= 0 && targetSlot <= layout.usedSlots) {
       focus = indexAtOrNearSlot(layout, targetSlot, Math.sign(columnMovement));

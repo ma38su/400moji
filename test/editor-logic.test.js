@@ -91,6 +91,28 @@ test("20マス目の句読点を行末文字と同じマスへ配置する", () 
   assert.deepEqual(layout.slots[19].trailingIndexes, [20]);
 });
 
+test("指定された行頭禁則文字を前の行末と同じマスへ配置する", () => {
+  for (const character of ["・", "ー", "！", "？", "」", "』", "）", "】", "］", "〉", "》", "〕", "々", "ゝ", "ゞ", "ヽ", "ヾ"]) {
+    const layout = layoutCharacters(characters(`${"あ".repeat(20)}${character}`));
+    assert.equal(layout.usedSlots, 20, `${character} が行頭へ送られない`);
+    assert.equal(layout.slots[19].trailing, character);
+  }
+});
+
+test("小さい仮名はデフォルトでは行頭禁則の対象にしない", () => {
+  const layout = layoutCharacters(characters(`${"あ".repeat(20)}っ`));
+  assert.equal(layout.usedSlots, 21);
+  assert.equal(layout.slots[20].value, "っ");
+});
+
+test("オプション有効時はひらがな・カタカナの小さい仮名を行頭へ置かない", () => {
+  for (const character of ["ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "っ", "ゃ", "ゅ", "ょ", "ゎ", "ゕ", "ゖ", "ァ", "ィ", "ゥ", "ェ", "ォ", "ッ", "ャ", "ュ", "ョ", "ヮ", "ヵ", "ヶ"]) {
+    const layout = layoutCharacters(characters(`${"あ".repeat(20)}${character}`), { prohibitSmallKanaAtLineStart: true });
+    assert.equal(layout.usedSlots, 20, `${character} が行頭へ送られない`);
+    assert.equal(layout.slots[19].trailing, character);
+  }
+});
+
 test("連続改行は空の縦列を確保する", () => {
   const layout = layoutCharacters(characters("あ\n\nい"));
   assert.equal(layout.caretSlots[3], 40);

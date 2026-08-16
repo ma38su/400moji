@@ -33,7 +33,8 @@ const els = {
   viewHint: document.querySelector("#viewHint"), fullscreenButton: document.querySelector("#fullscreenButton"),
   undoButton: document.querySelector("#undoButton"), redoButton: document.querySelector("#redoButton"),
   printPages: document.querySelector("#printPages"), contextMenu: document.querySelector("#paperContextMenu"),
-  printPreset: document.querySelector("#printPreset")
+  printPreset: document.querySelector("#printPreset"),
+  prohibitSmallKana: document.querySelector("#prohibitSmallKana")
 };
 
 let library = { activeId: "", documents: [] };
@@ -47,6 +48,13 @@ let viewMode = "paper";
 let paperSelectionAnchor = null;
 const historyStore = createHistoryStore();
 const documentPositions = new Map();
+
+function layoutOptions() {
+  return { prohibitSmallKanaAtLineStart: library.prohibitSmallKanaAtLineStart === true };
+}
+function currentLayout(text = documentState.body) {
+  return layoutCharacters(characters(text), layoutOptions());
+}
 
 function nameExists(name, exceptId = null) {
   return libraryNameExists(library, name, exceptId);
@@ -109,7 +117,7 @@ function restoreSnapshot(snapshot) {
   els.input.value = snapshot.body;
   els.input.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
   caret = unitToPoint(documentState.body, snapshot.selectionStart);
-  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
   scheduleSave();
   render();
 }
@@ -149,6 +157,7 @@ function load() {
   if (loaded.loadError) showToast("保存データを読み込めませんでした");
   applyActiveDocument();
   applyPrintPreset();
+  els.prohibitSmallKana.checked = library.prohibitSmallKanaAtLineStart === true;
   setViewMode(library.viewMode || "paper", false);
 }
 function scheduleSave() {
@@ -168,7 +177,7 @@ function save() {
 }
 function render() {
   const chars = characters(documentState.body);
-  const layout = layoutCharacters(chars);
+  const layout = layoutCharacters(chars, layoutOptions());
   // 400字ちょうど埋まったときは、続けて書ける空白の次ページも用意する。
   const pages = pageCountForWriting(layout.usedSlots);
   const previousPage = renderedPage;
@@ -222,7 +231,7 @@ function focusAt(index) {
 }
 function paperIndexFromPointer(event, cell) {
   const chars = characters(documentState.body);
-  const layout = layoutCharacters(chars);
+  const layout = layoutCharacters(chars, layoutOptions());
   const slot = Number(cell.dataset.slot);
   const rect = cell.getBoundingClientRect();
   const after = event.clientY >= rect.top + rect.height / 2;
@@ -239,7 +248,7 @@ function selectOnPaper(anchor, focus) {
     direction
   );
   caret = focus;
-  const layout = layoutCharacters(characters(documentState.body));
+  const layout = currentLayout();
   page = Math.floor(layout.caretSlots[caret] / PAPER.pageSize);
   scheduleSave();
   render();
@@ -413,7 +422,7 @@ els.input.addEventListener("input", () => {
   documentState.body = normalized;
   historyStore.commit(documentState.id, documentState.body);
   caret = unitToPoint(documentState.body, els.input.selectionStart);
-  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
   scheduleSave(); render(); updateHistoryButtons();
 });
 els.input.addEventListener("keydown", event => {
@@ -431,7 +440,7 @@ els.input.addEventListener("keydown", event => {
   if (viewMode === "edit") return;
   if (event.isComposing || event.altKey || event.metaKey || event.ctrlKey) return;
   const selection = paperSelectionPoints();
-  const moved = movePaperSelection(documentState.body, selection, event.key, event.shiftKey);
+  const moved = movePaperSelection(documentState.body, selection, event.key, event.shiftKey, layoutOptions());
   if (!moved) return;
   event.preventDefault();
   if (event.shiftKey) selectOnPaper(moved.anchor, moved.focus);
@@ -439,7 +448,7 @@ els.input.addEventListener("keydown", event => {
 });
 function syncCaretFromInput() {
   caret = paperSelectionPoints().focus;
-  page = Math.floor(layoutCharacters(characters(documentState.body)).caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
   scheduleSave(); render();
 }
 els.input.addEventListener("keyup", syncCaretFromInput);
@@ -455,6 +464,12 @@ els.printPreset.addEventListener("change", () => {
   applyPrintPreset();
   scheduleSave();
   showToast(els.printPreset.value === "jis-a4" ? "JIS寸法で印刷します" : "学校向け9mmマスで印刷します");
+});
+els.prohibitSmallKana.addEventListener("change", () => {
+  library.prohibitSmallKanaAtLineStart = els.prohibitSmallKana.checked;
+  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
+  scheduleSave();
+  render();
 });
 function commitDocumentName() {
   const nextName = normalizeName(els.title.value);
@@ -480,7 +495,7 @@ els.title.addEventListener("keydown", event => {
 els.title.addEventListener("blur", commitDocumentName);
 function moveToPage(targetPage) {
   const chars = characters(documentState.body);
-  const layout = layoutCharacters(chars);
+  const layout = layoutCharacters(chars, layoutOptions());
   const targetSlot = targetPage * PAPER.pageSize;
   page = targetPage;
   focusAt(layout.slotToIndex[targetSlot] ?? chars.length);
@@ -550,10 +565,10 @@ document.querySelector("#importJson").addEventListener("change", async event => 
   event.target.value = "";
 });
 document.querySelector("#printButton").addEventListener("click", () => {
-  renderPrintPages(els.printPages, documentState);
+  renderPrintPages(els.printPages, documentState, layoutOptions());
   window.print();
 });
-window.addEventListener("beforeprint", () => renderPrintPages(els.printPages, documentState));
+window.addEventListener("beforeprint", () => renderPrintPages(els.printPages, documentState, layoutOptions()));
 window.addEventListener("beforeunload", save);
 
 setupPlatformFeatures({

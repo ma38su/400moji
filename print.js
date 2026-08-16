@@ -15,8 +15,8 @@ export function applyPrintPreset(library, selectElement, root = document.documen
   return preset;
 }
 
-export function preparePrintPages(container, documentState) {
-  const layout = layoutCharacters(characters(documentState.body));
+export function preparePrintPages(container, documentState, layoutOptions = {}) {
+  const layout = layoutCharacters(characters(documentState.body), layoutOptions);
   const pageTotal = pageCountForPrint(layout.usedSlots);
   const fragment = document.createDocumentFragment();
   for (let page = 0; page < pageTotal; page++) {

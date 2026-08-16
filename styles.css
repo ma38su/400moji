@@ -55,6 +55,14 @@ button, summary { cursor: pointer; }
 .file-label input { display: none; }
 .print-preset-label { display: grid; gap: 6px; padding: 9px 10px 7px; color: var(--muted); font: 11px system-ui,sans-serif; }
 .print-preset-label select { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 5px; background: white; color: var(--ink); font: 12px system-ui,sans-serif; }
+.settings-button { display: grid; place-items: center; }
+.settings-panel { width: 260px; padding: 14px; gap: 10px; }
+.settings-title { color: var(--muted); font: 700 11px system-ui,sans-serif; letter-spacing: .08em; }
+.setting-option { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font: 13px system-ui,sans-serif; }
+.setting-option input { margin-top: 2px; accent-color: var(--red); }
+.setting-option span { display: grid; gap: 4px; }
+.setting-option strong { font-weight: 600; }
+.setting-option small { color: var(--muted); font-size: 11px; line-height: 1.45; }
 
 main { padding: 36px 4vw 64px; }
 .workspace { display: grid; grid-template-columns: 220px minmax(520px, 800px); justify-content: center; align-items: start; gap: 32px; }
