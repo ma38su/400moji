@@ -1,6 +1,10 @@
 # 原稿用紙アプリ - 400moji
 
 [![Deploy to GitHub Pages](https://github.com/ma38su/400moji/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/ma38su/400moji/actions/workflows/deploy-pages.yml)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-%E4%BD%BF%E3%81%86-2ea44f?logo=github)](https://ma38su.github.io/400moji/)
+[![Node.js 20.19+](https://img.shields.io/badge/Node.js-20.19%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Vite 7](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Tailwind CSS 4](https://img.shields.io/badge/Tailwind%20CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
 20字×20行の縦書き原稿用紙で、作文の下書きを作るためのシンプルなWebアプリです。
 
