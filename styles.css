@@ -36,6 +36,11 @@ button, summary { cursor: pointer; }
 .icon-button { min-width: 34px; padding-inline: 9px; font: 18px/1 system-ui, sans-serif; }
 .icon-button:disabled { opacity: .35; cursor: default; }
 .button, .text-button, .actions button, .file-label { border: 1px solid var(--line); background: #fffaf2; border-radius: 6px; padding: 8px 13px; font-size: 13px; }
+.compact-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.button-icon { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-minimize { display: none; }
+#fullscreenButton[aria-pressed="true"] .icon-expand { display: none; }
+#fullscreenButton[aria-pressed="true"] .icon-minimize { display: block; }
 .text-button { border-color: transparent; background: transparent; }
 .button.primary { background: var(--ink); color: white; border-color: var(--ink); }
 .install-button { color: var(--red); border-color: var(--grid-strong); }
@@ -158,6 +163,8 @@ main { padding: 36px 4vw 64px; }
 .file-card, .stat-card { padding: 22px; background: rgba(255,253,248,.72); border: 1px solid var(--line); border-radius: 8px; }
 .eyebrow { display: block; color: var(--red); font: 700 10px system-ui,sans-serif; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 12px; }
 .big-number { font-size: 38px; font-weight: 400; }
+.mobile-stat-line { display: inline; }
+.stat-unit { margin-left: 4px; }
 .meter { height: 3px; margin: 18px 0 10px; background: #ddd4c7; overflow: hidden; }
 .meter span { display: block; height: 100%; width: 0; background: var(--red); transition: width .2s; }
 .stat-card p { margin: 0; color: var(--muted); font: 12px/1.7 system-ui,sans-serif; }

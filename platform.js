@@ -3,7 +3,12 @@ export function setupPlatformFeatures({ fullscreenButton, installButton, showToa
   const fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement;
   const updateFullscreenButton = () => {
     const active = Boolean(fullscreenElement());
-    fullscreenButton.textContent = active ? "全画面を終了" : "全画面";
+    const label = active ? "全画面を終了" : "全画面";
+    const visibleLabel = fullscreenButton.querySelector(".button-label");
+    if (visibleLabel) visibleLabel.textContent = label;
+    else fullscreenButton.textContent = label;
+    fullscreenButton.setAttribute("aria-label", label);
+    fullscreenButton.title = label;
     fullscreenButton.setAttribute("aria-pressed", String(active));
   };
 

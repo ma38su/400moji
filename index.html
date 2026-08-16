@@ -28,10 +28,20 @@
         <button id="undoButton" class="button icon-button" type="button" aria-label="元に戻す" title="元に戻す（Ctrl/Cmd+Z）" disabled>↶</button>
         <button id="redoButton" class="button icon-button" type="button" aria-label="やり直す" title="やり直す（Ctrl/Cmd+Shift+Z）" disabled>↷</button>
       </div>
-      <button id="installApp" class="button install-button" type="button" hidden>アプリをインストール</button>
-      <button id="fullscreenButton" class="button" type="button" aria-pressed="false">全画面</button>
+      <button id="installApp" class="button install-button compact-action" type="button" hidden>
+        <svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+        <span class="button-label">アプリをインストール</span>
+      </button>
+      <button id="fullscreenButton" class="button compact-action" type="button" aria-pressed="false" aria-label="全画面" title="全画面">
+        <svg class="button-icon icon-expand" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        <svg class="button-icon icon-minimize" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M16 3v3a2 2 0 0 0 2 2h3"/><path d="M8 21v-3a2 2 0 0 0-2-2H3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        <span class="button-label">全画面</span>
+      </button>
       <details class="menu">
-        <summary class="button">ファイル</summary>
+        <summary class="button compact-action" aria-label="ファイルメニュー" title="ファイルメニュー">
+          <svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/></svg>
+          <span class="button-label">ファイル</span>
+        </summary>
         <div class="menu-panel">
           <button id="newDocument">新しいファイル</button>
           <button id="duplicateDocument">複製</button>
@@ -64,8 +74,7 @@
         </div>
         <div class="stat-card">
           <span class="eyebrow">原稿の状態</span>
-          <strong id="charCount" class="big-number">0</strong>
-          <span>マス使用</span>
+          <span class="mobile-stat-line"><strong id="charCount" class="big-number">0</strong><span class="stat-unit">マス使用</span></span>
           <div class="meter"><span id="meterFill"></span></div>
           <p id="sheetCount">1枚目・未入力</p>
           <p id="inputCharCount">入力文字数: 0文字</p>

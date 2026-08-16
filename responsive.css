@@ -36,17 +36,44 @@
 :fullscreen main { padding-top: 8px; }
 
 @media (max-width: 600px) {
-  .topbar { padding: 0 3vw; gap: 8px; }
+  body { min-height: 100dvh; }
+  .topbar { height: 52px; padding: 0 10px; gap: 6px; }
   .brand > span:last-child, #printButton, .history-actions { display:none; }
-  .title-input { width: 100%; }
-  main { padding: 22px 2vw 50px; }
-  .sidebar { grid-template-columns: 1fr; }
-  .paper-heading { width: 96vw; }
+  .brand { gap: 0; }
+  .brand-mark { width: 30px; height: 30px; font-size: 9px; }
+  .document-meta { gap: 4px; }
+  .title-input { width: 100%; min-width: 0; padding: 6px 3px; font-size: 14px; }
+  .actions { gap: 3px; }
+  .actions .compact-action { width: 34px; height: 34px; padding: 0; border-color: transparent; background: transparent; }
+  .actions .button-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .actions .button-icon { width: 18px; height: 18px; }
+  .menu-panel { position: fixed; top: 48px; right: 8px; width: min(260px, calc(100vw - 16px)); max-height: calc(100dvh - 60px); overflow-y: auto; }
+  main { padding: 8px 2vw 20px; }
+  .workspace { gap: 6px; }
+  .sidebar {
+    display: flex; position: static; gap: 6px; width: 96vw; margin: 0 auto;
+    align-items: center;
+  }
+  .file-card, .stat-card { min-width: 0; height: 38px; padding: 3px 4px; border-radius: 7px; background: rgba(255,253,248,.66); }
+  .file-card { flex: 1 1 auto; }
+  .file-card .eyebrow, .stat-card > .eyebrow, .stat-card .meter, #inputCharCount { display: none; }
+  .document-select { height: 30px; padding: 4px 25px 4px 7px; border: 0; background: transparent; font-size: 12px; }
+  .stat-card { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding-inline: 9px; }
+  .mobile-stat-line { display: flex; align-items: baseline; gap: 2px; white-space: nowrap; }
+  .big-number { font: 600 14px/1 system-ui,sans-serif; }
+  .stat-unit { margin: 0; color: var(--muted); font: 10px/1 system-ui,sans-serif; }
+  .stat-card p { white-space: nowrap; font-size: 10px; line-height: 1; }
+  .paper-heading { width: 96vw; min-height: 32px; margin-bottom: 5px; }
+  .view-switch { padding: 2px; }
+  .view-switch button { min-height: 26px; padding: 4px 8px; font-size: 11px; }
+  .paper-pagination { min-height: 32px; gap: 5px; }
+  .paper-pagination span { min-width: 38px; font-size: 11px; }
+  .page-nav button { width: 30px; height: 30px; }
   .paper {
     --binding: 28px; --column-gap: 2px; --paper-pad: 8px;
     --cell: calc((96vw - var(--binding) - var(--column-gap) * 20 - var(--paper-pad) * 2) / 20);
   }
-  .paper-wrap.edit-mode .input-proxy { width: 96vw; height: 70vh; padding: 18px; font-size: 19px; }
+  .paper-wrap.edit-mode .input-proxy { width: 96vw; height: calc(100dvh - 141px); min-height: 360px; padding: 16px; font-size: 18px; }
   .keyboard-hint { display: none; }
 }
 
