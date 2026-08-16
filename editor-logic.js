@@ -48,7 +48,9 @@ export function layoutCharacters(chars, options = {}) {
       slots[slot - 1].trailing = `${slots[slot - 1].trailing || ""}${value}`;
       (slots[slot - 1].trailingIndexes ||= []).push(index);
       caretPositions[index] = { slot: slot - 1, trailingOffset };
-      caretPositions[index + 1] = { slot: slot - 1, trailingOffset: trailingOffset + 1 };
+      // 禁則文字を越えた位置は、禁則文字がない場合と同じ次行頭に置く。
+      // 次の文字も禁則対象なら、その文字の処理時に同じマス内の位置へ上書きされる。
+      caretPositions[index + 1] = { slot, trailingOffset: null };
       return;
     }
     slots[slot] = { value, index };

@@ -91,8 +91,14 @@ test("20マス目の句読点を行末文字と同じマスへ配置する", () 
   assert.equal(layout.slots[19].trailing, "。");
   assert.deepEqual(layout.slots[19].trailingIndexes, [20]);
   assert.deepEqual(layout.caretPositions[20], { slot: 19, trailingOffset: 0 });
-  assert.deepEqual(layout.caretPositions[21], { slot: 19, trailingOffset: 1 });
-  assert.equal(caretSlotAtIndex(layout, 21), 19);
+  assert.deepEqual(layout.caretPositions[21], { slot: 20, trailingOffset: null });
+  assert.equal(caretSlotAtIndex(layout, 21), 20);
+});
+
+test("禁則文字を越えたカーソルは禁則文字がない場合と同じ行頭へ進む", () => {
+  const withoutProhibited = layoutCharacters(characters("あ".repeat(20)));
+  const withProhibited = layoutCharacters(characters(`${"あ".repeat(20)}。`));
+  assert.deepEqual(withProhibited.caretPositions[21], withoutProhibited.caretPositions[20]);
 });
 
 test("追い込まれた禁則文字の前後をクリックで別の挿入位置として選べる", () => {
@@ -106,7 +112,7 @@ test("連続する禁則文字の各文字間にカーソルを置ける", () =>
   const layout = layoutCharacters(characters(`${"あ".repeat(20)}。」`));
   assert.deepEqual(layout.caretPositions[20], { slot: 19, trailingOffset: 0 });
   assert.deepEqual(layout.caretPositions[21], { slot: 19, trailingOffset: 1 });
-  assert.deepEqual(layout.caretPositions[22], { slot: 19, trailingOffset: 2 });
+  assert.deepEqual(layout.caretPositions[22], { slot: 20, trailingOffset: null });
   assert.equal(indexAtCellPosition(layout, 19, .5), 20);
   assert.equal(indexAtCellPosition(layout, 19, .7), 21);
   assert.equal(indexAtCellPosition(layout, 19, .95), 22);
