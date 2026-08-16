@@ -137,6 +137,7 @@ main { padding: 36px 4vw 64px; }
   place-items: stretch;
   padding: 0;
   font-size: calc(var(--cell) * .52);
+  writing-mode: horizontal-tb;
 }
 .compressed-character {
   grid-column: 1;
