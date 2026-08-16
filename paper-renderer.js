@@ -10,10 +10,17 @@ function createCell(layout, absoluteSlot, selectionStart, selectionEnd, caret, i
   if (VERTICAL_PUNCTUATION.has(value)) cell.classList.add("punctuation");
   if (/^[A-Za-z]$/.test(value)) cell.classList.add("latin");
   if (entry?.trailing) {
-    const trailing = document.createElement("span");
-    trailing.className = "line-end-punctuation";
-    trailing.textContent = entry.trailing;
-    cell.appendChild(trailing);
+    const compressedCharacters = [value, ...Array.from(entry.trailing)];
+    cell.textContent = "";
+    cell.classList.add("has-trailing");
+    cell.style.setProperty("--compressed-count", String(compressedCharacters.length));
+    compressedCharacters.forEach((character, index) => {
+      const compressed = document.createElement("span");
+      compressed.className = "compressed-character";
+      compressed.textContent = character;
+      compressed.style.gridRow = String(index + 1);
+      cell.appendChild(compressed);
+    });
   }
 
   const offset = absoluteSlot % PAPER.pageSize;
@@ -29,7 +36,7 @@ function createCell(layout, absoluteSlot, selectionStart, selectionEnd, caret, i
       cell.classList.add("caret");
       if (caretPosition.trailingOffset !== null) {
         const trailingCount = entry?.trailingIndexes?.length || 1;
-        cell.style.setProperty("--caret-position", String(50 + 50 * caretPosition.trailingOffset / trailingCount));
+        cell.style.setProperty("--caret-position", String(100 * (caretPosition.trailingOffset + 1) / (trailingCount + 1)));
       }
     }
     if (absoluteSlot === caretPosition.slot) cell.classList.add("active");

@@ -74,14 +74,7 @@ export function indexAtCellPosition(layout, targetSlot, relativePosition) {
     return indexAtOrNearSlot(layout, after ? targetSlot + 1 : targetSlot, after ? 1 : -1);
   }
   const characterIndexes = [entry.index, ...(entry.trailingIndexes || [])];
-  const trailingCount = characterIndexes.length - 1;
-  const caretStops = trailingCount
-    ? [0, ...Array.from({ length: trailingCount + 1 }, (_, offset) => .5 + .5 * offset / trailingCount)]
-    : [0, 1];
-  let boundary = 0;
-  for (let index = 1; index < caretStops.length; index++) {
-    if (Math.abs(caretStops[index] - relativePosition) < Math.abs(caretStops[boundary] - relativePosition)) boundary = index;
-  }
+  const boundary = Math.max(0, Math.min(characterIndexes.length, Math.round(relativePosition * characterIndexes.length)));
   return boundary === characterIndexes.length ? characterIndexes.at(-1) + 1 : characterIndexes[boundary];
 }
 

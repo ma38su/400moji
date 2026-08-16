@@ -132,13 +132,17 @@ main { padding: 36px 4vw 64px; }
   font-feature-settings: normal;
   font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif CJK JP", "Noto Serif JP", serif;
 }
-.line-end-punctuation {
-  position: absolute;
-  z-index: 2;
-  top: 52%; right: 2%; bottom: 0; left: 48%;
-  display: grid; place-items: start end;
-  overflow: visible;
-  font-size: calc(var(--cell) * .44); line-height: 1;
+.cell.has-trailing {
+  grid-template: repeat(var(--compressed-count), minmax(0, 1fr)) / 1fr;
+  place-items: stretch;
+  padding: 0;
+  font-size: calc(var(--cell) * .52);
+}
+.compressed-character {
+  grid-column: 1;
+  display: grid; place-items: center;
+  width: 100%; min-height: 0;
+  line-height: 1;
   writing-mode: vertical-rl; text-orientation: mixed;
   font-feature-settings: "vert" 1, "vrt2" 1;
 }

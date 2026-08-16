@@ -113,7 +113,7 @@ test("連続する禁則文字の各文字間にカーソルを置ける", () =>
   assert.deepEqual(layout.caretPositions[20], { slot: 19, trailingOffset: 0 });
   assert.deepEqual(layout.caretPositions[21], { slot: 19, trailingOffset: 1 });
   assert.deepEqual(layout.caretPositions[22], { slot: 20, trailingOffset: null });
-  assert.equal(indexAtCellPosition(layout, 19, .5), 20);
+  assert.equal(indexAtCellPosition(layout, 19, .4), 20);
   assert.equal(indexAtCellPosition(layout, 19, .7), 21);
   assert.equal(indexAtCellPosition(layout, 19, .95), 22);
 });
