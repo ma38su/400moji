@@ -3,7 +3,7 @@ import "./responsive.css";
 import "./print.css";
 import {
   characters, pointToUnit, unitToPoint,
-  layoutCharacters, indexAtOrNearSlot, selectionPoints, movePaperSelection,
+  layoutCharacters, caretSlotAtIndex, indexAtCellPosition, selectionPoints, movePaperSelection,
   textInSelection, replaceTextSelection
 } from "./editor-logic.js";
 import { PAPER } from "./app-config.js";
@@ -117,7 +117,7 @@ function restoreSnapshot(snapshot) {
   els.input.value = snapshot.body;
   els.input.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
   caret = unitToPoint(documentState.body, snapshot.selectionStart);
-  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(caretSlotAtIndex(currentLayout(), caret) / PAPER.pageSize);
   scheduleSave();
   render();
 }
@@ -234,8 +234,8 @@ function paperIndexFromPointer(event, cell) {
   const layout = layoutCharacters(chars, layoutOptions());
   const slot = Number(cell.dataset.slot);
   const rect = cell.getBoundingClientRect();
-  const after = event.clientY >= rect.top + rect.height / 2;
-  return indexAtOrNearSlot(layout, after ? slot + 1 : slot, after ? 1 : -1);
+  const relativePosition = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+  return indexAtCellPosition(layout, slot, relativePosition);
 }
 function selectOnPaper(anchor, focus) {
   const start = Math.min(anchor, focus);
@@ -249,7 +249,7 @@ function selectOnPaper(anchor, focus) {
   );
   caret = focus;
   const layout = currentLayout();
-  page = Math.floor(layout.caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(caretSlotAtIndex(layout, caret) / PAPER.pageSize);
   scheduleSave();
   render();
 }
@@ -422,7 +422,7 @@ els.input.addEventListener("input", () => {
   documentState.body = normalized;
   historyStore.commit(documentState.id, documentState.body);
   caret = unitToPoint(documentState.body, els.input.selectionStart);
-  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(caretSlotAtIndex(currentLayout(), caret) / PAPER.pageSize);
   scheduleSave(); render(); updateHistoryButtons();
 });
 els.input.addEventListener("keydown", event => {
@@ -448,7 +448,7 @@ els.input.addEventListener("keydown", event => {
 });
 function syncCaretFromInput() {
   caret = paperSelectionPoints().focus;
-  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(caretSlotAtIndex(currentLayout(), caret) / PAPER.pageSize);
   scheduleSave(); render();
 }
 els.input.addEventListener("keyup", syncCaretFromInput);
@@ -467,7 +467,7 @@ els.printPreset.addEventListener("change", () => {
 });
 els.prohibitSmallKana.addEventListener("change", () => {
   library.prohibitSmallKanaAtLineStart = els.prohibitSmallKana.checked;
-  page = Math.floor(currentLayout().caretSlots[caret] / PAPER.pageSize);
+  page = Math.floor(caretSlotAtIndex(currentLayout(), caret) / PAPER.pageSize);
   scheduleSave();
   render();
 });

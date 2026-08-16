@@ -24,8 +24,15 @@ function createCell(layout, absoluteSlot, selectionStart, selectionEnd, caret, i
   if (interactive) {
     const cellIndexes = [layout.slotToIndex[absoluteSlot], ...(entry?.trailingIndexes || [])];
     if (cellIndexes.some(index => index >= selectionStart && index < selectionEnd)) cell.classList.add("selected");
-    if (absoluteSlot === layout.caretSlots[caret] && caretVisible) cell.classList.add("caret");
-    if (absoluteSlot === layout.caretSlots[caret]) cell.classList.add("active");
+    const caretPosition = layout.caretPositions?.[caret] || { slot: layout.caretSlots[caret], trailingOffset: null };
+    if (absoluteSlot === caretPosition.slot && caretVisible) {
+      cell.classList.add("caret");
+      if (caretPosition.trailingOffset !== null) {
+        const trailingCount = entry?.trailingIndexes?.length || 1;
+        cell.style.setProperty("--caret-position", String(50 + 50 * caretPosition.trailingOffset / trailingCount));
+      }
+    }
+    if (absoluteSlot === caretPosition.slot) cell.classList.add("active");
     cell.dataset.slot = absoluteSlot;
   }
   return cell;

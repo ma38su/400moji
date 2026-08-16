@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   characters, pointToUnit, unitToPoint, layoutCharacters,
-  selectionPoints, movePaperSelection, textInSelection, replaceTextSelection
+  caretSlotAtIndex, indexAtCellPosition, selectionPoints, movePaperSelection,
+  textInSelection, replaceTextSelection
 } from "../editor-logic.js";
 
 test("UTF-16の選択位置と原稿用紙上の文字位置を相互変換する", () => {
@@ -89,6 +90,26 @@ test("20マス目の句読点を行末文字と同じマスへ配置する", () 
   assert.equal(layout.usedSlots, 20);
   assert.equal(layout.slots[19].trailing, "。");
   assert.deepEqual(layout.slots[19].trailingIndexes, [20]);
+  assert.deepEqual(layout.caretPositions[20], { slot: 19, trailingOffset: 0 });
+  assert.deepEqual(layout.caretPositions[21], { slot: 19, trailingOffset: 1 });
+  assert.equal(caretSlotAtIndex(layout, 21), 19);
+});
+
+test("追い込まれた禁則文字の前後をクリックで別の挿入位置として選べる", () => {
+  const layout = layoutCharacters(characters(`${"あ".repeat(20)}。`));
+  assert.equal(indexAtCellPosition(layout, 19, .1), 19);
+  assert.equal(indexAtCellPosition(layout, 19, .55), 20);
+  assert.equal(indexAtCellPosition(layout, 19, .9), 21);
+});
+
+test("連続する禁則文字の各文字間にカーソルを置ける", () => {
+  const layout = layoutCharacters(characters(`${"あ".repeat(20)}。」`));
+  assert.deepEqual(layout.caretPositions[20], { slot: 19, trailingOffset: 0 });
+  assert.deepEqual(layout.caretPositions[21], { slot: 19, trailingOffset: 1 });
+  assert.deepEqual(layout.caretPositions[22], { slot: 19, trailingOffset: 2 });
+  assert.equal(indexAtCellPosition(layout, 19, .5), 20);
+  assert.equal(indexAtCellPosition(layout, 19, .7), 21);
+  assert.equal(indexAtCellPosition(layout, 19, .95), 22);
 });
 
 test("指定された行頭禁則文字を前の行末と同じマスへ配置する", () => {

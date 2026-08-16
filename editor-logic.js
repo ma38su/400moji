@@ -26,11 +26,13 @@ export function layoutCharacters(chars, options = {}) {
   const { prohibitSmallKanaAtLineStart = false } = options;
   const slots = [];
   const caretSlots = new Array(chars.length + 1);
+  const caretPositions = new Array(chars.length + 1);
   const slotToIndex = [];
   let slot = 0;
 
   chars.forEach((value, index) => {
     caretSlots[index] = slot;
+    caretPositions[index] ||= { slot, trailingOffset: null };
     if (value === "\n") {
       const columnOffset = slot % PAPER.rows;
       const startsBlankColumn = columnOffset === 0 && (index === 0 || chars[index - 1] === "\n");
@@ -42,8 +44,11 @@ export function layoutCharacters(chars, options = {}) {
     const prohibitedAtLineStart = LINE_START_PROHIBITED.has(value)
       || (prohibitSmallKanaAtLineStart && SMALL_KANA.has(value));
     if (prohibitedAtLineStart && slot > 0 && slot % PAPER.rows === 0 && chars[index - 1] !== "\n" && slots[slot - 1]) {
+      const trailingOffset = slots[slot - 1].trailingIndexes?.length || 0;
       slots[slot - 1].trailing = `${slots[slot - 1].trailing || ""}${value}`;
       (slots[slot - 1].trailingIndexes ||= []).push(index);
+      caretPositions[index] = { slot: slot - 1, trailingOffset };
+      caretPositions[index + 1] = { slot: slot - 1, trailingOffset: trailingOffset + 1 };
       return;
     }
     slots[slot] = { value, index };
@@ -52,7 +57,30 @@ export function layoutCharacters(chars, options = {}) {
   });
 
   caretSlots[chars.length] = slot;
-  return { slots, caretSlots, slotToIndex, usedSlots: slot };
+  caretPositions[chars.length] ||= { slot, trailingOffset: null };
+  return { slots, caretSlots, caretPositions, slotToIndex, usedSlots: slot };
+}
+
+export function caretSlotAtIndex(layout, index) {
+  return layout.caretPositions?.[index]?.slot ?? layout.caretSlots[index];
+}
+
+export function indexAtCellPosition(layout, targetSlot, relativePosition) {
+  const entry = layout.slots[targetSlot];
+  if (!entry) {
+    const after = relativePosition >= .5;
+    return indexAtOrNearSlot(layout, after ? targetSlot + 1 : targetSlot, after ? 1 : -1);
+  }
+  const characterIndexes = [entry.index, ...(entry.trailingIndexes || [])];
+  const trailingCount = characterIndexes.length - 1;
+  const caretStops = trailingCount
+    ? [0, ...Array.from({ length: trailingCount + 1 }, (_, offset) => .5 + .5 * offset / trailingCount)]
+    : [0, 1];
+  let boundary = 0;
+  for (let index = 1; index < caretStops.length; index++) {
+    if (Math.abs(caretStops[index] - relativePosition) < Math.abs(caretStops[boundary] - relativePosition)) boundary = index;
+  }
+  return boundary === characterIndexes.length ? characterIndexes.at(-1) + 1 : characterIndexes[boundary];
 }
 
 export function indexAtOrNearSlot(layout, targetSlot, direction) {
